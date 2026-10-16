@@ -173,6 +173,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
     Test_RunSuite("R4Final1", Test_Suite_R4Final1);
     Test_RunSuite("R3Balance", Test_Suite_R3Balance);
+    Test_RunSuite("Release", Test_Suite_Release);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -19304,4 +19305,134 @@ function Test_R3BalanceGold() {
     Test_Eq("r3balance D193: GOLD_PER_LEVEL is 0.5", GOLD_PER_LEVEL, 0.5);
     Test_Eq("r3balance D193: the Coin Purse card gives 8 gold", CardDB_Get("fb:gold").params.gold, 8);
     Test_Eq("r3balance D193: prices stay (Smoke Bomb 21)", Shop_Price(33), 21);
+}
+
+// ============================================================================================================================
+// Release packet (D188, D189, D190, D194): NO HOPE v1.0. The version shows next to the build id, the window reads NO HOPE, the title has a Credits entry that opens a
+// scrolling page, and the credits name every source the game really uses (nothing pending, no music that is not in the game). The expected strings come from the brief
+// and from the verified report (.planning/research/credits-check.md), not from the code.
+// ============================================================================================================================
+function Test_Suite_Release() {
+    Test_RunSuite("Release.version", Test_ReleaseVersion);
+    Test_RunSuite("Release.title", Test_ReleaseTitle);
+    Test_RunSuite("Release.credits", Test_ReleaseCredits);
+    Test_RunSuite("Release.scroll", Test_ReleaseScroll);
+    Test_RunSuite("Release.fit", Test_ReleaseFit);
+}
+
+function Test_ReleaseVersion() {
+    Test_Eq("release: VERSION is 1.0", VERSION, "1.0");
+    Test_Eq("release: GAME_TITLE is NO HOPE", GAME_TITLE, "NO HOPE");
+    Test_Eq("release: the label on the screen is the version, a dash and the short build id", Build_LabelText(), "v1.0 - " + Build_IdShort());
+    Test_Eq("release: the label stands where the build id did, as wide as its text", Build_IdRect().w, UI_TextWidth(Build_LabelText()));
+    window_set_caption("something else");
+    Display_ApplyCaption();
+    Test_Eq("release: the window caption reads NO HOPE", window_get_caption(), "NO HOPE");
+}
+
+function Test_ReleaseIds(_items) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_items); _i++) _out += ((_i > 0) ? "," : "") + _items[_i].id;
+    return _out;
+}
+
+function Test_ReleaseTitle() {
+    var _a = Title_MainItems(false, false);
+    Test_Eq("release title: the rows in order, Credits between Settings and Quit", Test_ReleaseIds(_a), "continue,new,load,settings,credits,exit");
+    Test_Eq("release title: the Credits row reads Credits", _a[4].label, "Credits");
+    Test_True("release title: Credits is always on", _a[4].enabled);
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("ko");
+    var _k = Title_MainItems(false, false);
+    Test_True("release title: the Credits row has a Korean label", _k[4].label != "Credits" && _k[4].label != "");
+    Loc_SetLanguage(_lang0);
+    var _c = Test_R3s2Title();
+    var _m = _c.title_stk.menus[0];
+    Title_OnConfirm(_m, 4);
+    Test_True("release title: confirming Credits opens the credits page", is_struct(Title_CreditsOf(_c)));
+    Test_Eq("release title: the page starts at the top", Title_CreditsOf(_c).scroll, 0);
+    Title_CreditsClose(_c);
+    Test_False("release title: closing it leaves the title", is_struct(Title_CreditsOf(_c)));
+    Test_True("release title: and the press that closed it must not answer the title", current_time - _m.lock_ms < UI_INPUT_LOCK_MS);
+}
+
+// Every credit the brief and D190 name, as the text a player reads (proper names do not change in Korean).
+function Test_ReleaseNeeds() {
+    return ["NO HOPE", "PaleRook", "GameMaker", "Kenney 1-Bit Pack", "CC0", "Stable Diffusion", "Pixel Art XL", "Nathan Gibson", "Cyrex Studios", "Universal UI/Menu Soundpack",
+        "CC BY 4.0", "Fesliyan Studios", "Atelier Magicae", "Beasts SFX Vol.1", "Monster SFX Vol.1", "YourPalRob", "Must-Have Horror Sound Effects", "Ifness", "Fantasy Vol. 3 Kingdoms",
+        "rubberduck", "Ogrebane", "Darsycho", "OpenGameArt", "Galmuri", "Lee Minseo", "OFL", "Retro Gaming"];
+}
+
+function Test_ReleaseCredits() {
+    var _lang0 = Loc_GetLanguage();
+    var _en_rows = [];
+    var _ko_rows = [];
+    var _langs = ["en", "ko"];
+    for (var _l = 0; _l < 2; _l++) {
+        Loc_SetLanguage(_langs[_l]);
+        var _rows = Credits_PlainLines();
+        var _all = Test_StoryJoin(_rows);
+        if (_l == 0) _en_rows = _rows; else _ko_rows = _rows;
+        var _needs = Test_ReleaseNeeds();
+        var _missing = "";
+        for (var _i = 0; _i < array_length(_needs); _i++) { if (string_pos(_needs[_i], _all) == 0) _missing += _needs[_i] + "|"; }
+        Test_Eq("release credits " + _langs[_l] + ": every required credit is there", _missing, "");
+        var _low = string_lower(_all);
+        Test_True("release credits " + _langs[_l] + ": no battle / boss music line (D194: no new music)", string_pos("boss", _low) == 0 && string_pos("battle", _low) == 0 && string_pos("owner", _low) == 0);
+        Test_True("release credits " + _langs[_l] + ": nothing pending or to supply", string_pos("pending", _low) == 0 && string_pos("to supply", _low) == 0 && string_pos("tbd", _low) == 0);
+        Test_True("release credits " + _langs[_l] + ": no per-file sound list any more", string_pos("Modern1", _all) == 0 && string_pos("Punch_1", _all) == 0 && string_pos("slime_spawn_2", _all) == 0);
+        Test_True("release credits " + _langs[_l] + ": the music is credited to the pack it came from (Ifness) and to no candidate pick", string_pos("Ifness", _all) > 0 && string_pos("Wolfgang", _all) == 0 && string_pos("MintoDog", _all) == 0);
+        Test_True("release credits " + _langs[_l] + ": the title line says NO HOPE and the next one a game by PaleRook", _rows[0] == "NO HOPE" && string_pos("PaleRook", _rows[1]) > 0);
+    }
+    var _changed = 0;
+    for (var _r = 0; _r < min(array_length(_en_rows), array_length(_ko_rows)); _r++) { if (_en_rows[_r] != _ko_rows[_r]) _changed++; }
+    Test_Eq("release credits: en and ko have the same number of rows", array_length(_ko_rows), array_length(_en_rows));
+    Test_True("release credits: the Korean rows are really translated (headings and sentences differ from English)", _changed >= 12);
+    Loc_SetLanguage(_lang0);
+    var _full = Credits_Lines();
+    Test_True("release credits: headings and gaps still frame the rows", array_length(_full) > array_length(_en_rows));
+}
+
+function Test_ReleaseScroll() {
+    Test_Eq("release scroll: the most a page can scroll is the part of the roll below the body", Credits_ScrollMax(1000, 400), 600);
+    Test_Eq("release scroll: a roll that fits never scrolls", Credits_ScrollMax(300, 400), 0);
+    Test_Eq("release scroll: above the top clamps to 0", Credits_ScrollClamp(-5, 1000, 400), 0);
+    Test_Eq("release scroll: below the end clamps to the end", Credits_ScrollClamp(700, 1000, 400), 600);
+    Test_Eq("release scroll: inside is left alone", Credits_ScrollClamp(123, 1000, 400), 123);
+    // line 10 px, body 100 px, roll 1000 px: a held key moves 6 lines (60 px) a second, one wheel notch 3 lines, a page the body less two lines, a drag as far as the pointer went
+    Test_Eq("release scroll: Down held for one second moves 60 px", Credits_ScrollInput(0, 1000, 100, 10, 1000, 1, 0, 0, 0), 60);
+    Test_Eq("release scroll: Up held for half a second moves 30 px back", Credits_ScrollInput(100, 1000, 100, 10, 500, -1, 0, 0, 0), 70);
+    Test_Eq("release scroll: Up at the top stays at the top", Credits_ScrollInput(0, 1000, 100, 10, 1000, -1, 0, 0, 0), 0);
+    Test_Eq("release scroll: one wheel notch down moves 30 px", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, 0, -1, 0), 30);
+    Test_Eq("release scroll: one wheel notch up moves 30 px back", Credits_ScrollInput(100, 1000, 100, 10, 16, 0, 0, 1, 0), 70);
+    Test_Eq("release scroll: a page forward moves the body less two lines (80 px)", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, 1, 0, 0), 80);
+    Test_Eq("release scroll: a page back from the top stays", Credits_ScrollInput(0, 1000, 100, 10, 16, 0, -1, 0, 0), 0);
+    Test_Eq("release scroll: dragging the page up by 17 px reads 17 px further down", Credits_ScrollInput(50, 1000, 100, 10, 16, 0, 0, 0, 17), 67);
+    Test_Eq("release scroll: never past the end", Credits_ScrollInput(880, 1000, 100, 10, 1000, 1, 0, 0, 0), 900);
+}
+
+// Every row of the roll fits at 480 x 432, 640 x 576 and 800 x 720, in English and Korean: short rows in the width between the margins, paragraphs wrapped in the roll's column;
+// the title menu with its sixth row still fits.
+function Test_ReleaseFit() {
+    TextFit_Each("release credits rows", function(_w, _h, _lang) {
+        var _fails = [];
+        var _mt = Ui_Metrics();
+        var _l = Credits_Layout();
+        var _lines = Credits_Lines();
+        var _ymax = 0;
+        for (var _i = 0; _i < array_length(_l.rows); _i++) {
+            var _r = _l.rows[_i];
+            if (_r.kind == "title" || _r.kind == "head" || _r.kind == "line") TextFit_Line(_fails, "credits " + _r.kind, _r.text, _mt.gw - 2 * _mt.margin);
+            else if (_r.kind == "para") TextFit_Block(_fails, "credits para", _r.text, _l.col_w, _mt.p);
+            _ymax = max(_ymax, _r.y + _r.h);
+        }
+        if (array_length(_l.rows) != array_length(_lines)) array_push(_fails, "layout has " + string(array_length(_l.rows)) + " rows for " + string(array_length(_lines)));
+        if (_l.total < _ymax) array_push(_fails, "total " + string(_l.total) + " is shorter than the last row " + string(_ymax));
+        return _fails;
+    });
+    TextFit_Each("release title menu", function(_w, _h, _lang) {
+        var _fails = [];
+        TextFit_CentreMenu(_fails, "title", Title_MainItems(true, true), "");
+        return _fails;
+    });
 }
