@@ -161,6 +161,7 @@ function Test_RunAll() {
     Test_RunSuite("R3FixDet", Test_Suite_R3FixDet);
     Test_RunSuite("R3Guard", Test_Suite_R3Guard);
     Test_RunSuite("R3Wolf", Test_Suite_R3Wolf);
+    Test_RunSuite("R3Shop", Test_Suite_R3Shop);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -16332,4 +16333,57 @@ function Test_R3WolfRun(_prefix) {
 
     _gs.flags = _old_flags;
     if (_had_battle) { _gs.battle.enemy_id = _old_id; _gs.battle.enemy_room = _old_room; } else variable_struct_remove(_gs, "battle");
+}
+
+// ---- R3 guardsmall item 3 (R-104, owner note 20): a shop row the player cannot carry (full throwables, gear already owned) is dimmed and its details say why; buying is still refused and keeps the gold. ----
+function Test_Suite_R3Shop() {
+    var _gs = GameState_Get();
+    var _had_run = variable_struct_exists(_gs, "run");
+    var _old_run = _had_run ? _gs.run : undefined;
+    _gs.run = Run_Create(4711);
+    _gs.run.gold = 200;
+    var _full_txt = Loc_T("shop.reason.full", "Bag full for this item");
+    var _owned_txt = Loc_T("shop.reason.owned", "Already owned");
+
+    // full throwables: the Firebomb (30) row
+    var _kn = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn.inventory = Inv_Add(_kn.inventory, 30, Throw_Cap(_kn));
+    var _row = { kind: "item", id: 30, qty: 2, price: 27 };
+    var _r1 = ShopUi_ItemFor(_row, _kn, 200);
+    Test_True("r3shop: a Firebomb row is dim when the throwable cap is reached (with gold to spare)", _r1.dim);
+    Test_False("r3shop: and cannot be bought", _r1.can_buy);
+    Test_True("r3shop: the row can still be looked at", _r1.enabled);
+    Test_True("r3shop: the details say 'Bag full for this item'", string_pos(_full_txt, _r1.help) > 0);
+    var _gold0 = _gs.run.gold;
+    var _buy = Shop_Buy(_kn, _gs.run, _row);
+    Test_False("r3shop: buying is still refused", _buy.ok);
+    Test_Eq("r3shop: with the reason 'full'", _buy.reason, "full");
+    Test_Eq("r3shop: the gold is unchanged", _gs.run.gold, _gold0);
+    Test_Eq("r3shop: the stock is unchanged", _row.qty, 2);
+
+    // room for one more: the same row is a normal buyable row, with no reason
+    var _kn2 = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn2.inventory = Inv_Add(_kn2.inventory, 30, Throw_Cap(_kn2) - 1);
+    var _r2 = ShopUi_ItemFor({ kind: "item", id: 30, qty: 2, price: 27 }, _kn2, 200);
+    Test_True("r3shop: with room for one more the row is buyable", _r2.can_buy && !_r2.dim);
+    Test_True("r3shop: and shows no reason", string_pos(_full_txt, _r2.help) == 0 && string_pos(_owned_txt, _r2.help) == 0);
+
+    // gear already owned (worn or in the bag)
+    var _kn3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _kn3.inventory = Inv_Add(_kn3.inventory, 1, 1);
+    Equip_Item(_kn3, 1);
+    var _r3 = ShopUi_ItemFor({ kind: "item", id: 1, qty: 1, price: 30 }, _kn3, 200);
+    Test_True("r3shop: a weapon the player already has is dim and cannot be bought", _r3.dim && !_r3.can_buy);
+    Test_True("r3shop: the details say 'Already owned'", string_pos(_owned_txt, _r3.help) > 0);
+    Test_False("r3shop: buying it is refused", Shop_Buy(_kn3, _gs.run, { kind: "item", id: 1, qty: 1, price: 30 }).ok);
+    var _r4 = ShopUi_ItemFor({ kind: "item", id: 2, qty: 1, price: 30 }, _kn3, 200);
+    Test_True("r3shop: a different weapon is buyable", _r4.can_buy && !_r4.dim && string_pos(_owned_txt, _r4.help) == 0);
+
+    // the old dims stay: no gold, and sold out, with no bag reason
+    var _r5 = ShopUi_ItemFor({ kind: "item", id: 10, qty: 3, price: 12 }, CharacterCreate_Player(CLASS_KNIGHT), 5);
+    Test_True("r3shop: too little gold still dims a row, with no bag reason", _r5.dim && !_r5.can_buy && string_pos(_full_txt, _r5.help) == 0 && string_pos(_owned_txt, _r5.help) == 0);
+    var _r6 = ShopUi_ItemFor({ kind: "item", id: 30, qty: 0, price: 27 }, _kn, 200);
+    Test_True("r3shop: a sold-out row is dim and says Sold Out, not the bag reason", _r6.dim && _r6.value == Loc_T("shop.sold_out", "Sold Out") && string_pos(_full_txt, _r6.help) == 0);
+
+    if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
 }
