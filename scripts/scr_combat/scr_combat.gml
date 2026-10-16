@@ -716,6 +716,11 @@ function Battle_StunResolve(_bc) {
     return note;
 }
 
+// The sound layered on the grade sound when a hit BREAKs. (_perfect: the grade sound already is the Perfect sample.)
+function Battle_BreakSfxKey(_perfect) {
+    return Qte_GradeSfxKey(QTE_PERFECT);
+}
+
 // A landed player hit fills the enemy's stagger meter; a full meter is a BREAK (D75, D92). Returns the text to add to the battle message.
 function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     var e = _bc.e;
@@ -730,7 +735,7 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     _bc.tl_slide_kind = 1;
     _bc.break_start = current_time;
     var last_key = global.sfx_last_key;   // the BREAK sound is a second layer on top of the grade sound: the grade stays the "last key" the bot checks
-    SFX_Play(Qte_GradeSfxKey(QTE_PERFECT));
+    SFX_Play(Battle_BreakSfxKey(_perfect));
     global.sfx_last_key = last_key;
     CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
     if (_bc.hitstop_ms > 0) {   // D138 / D139: the hit's freeze is still to come: a BREAK freezes 120 ms and punches the zoom in (Battle_HitFeel)

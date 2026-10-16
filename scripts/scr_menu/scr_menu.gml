@@ -4216,6 +4216,11 @@ function Ui_StackBack(_stk) {
     return "pop";
 }
 
+// The sound a Confirm on row _i of menu _m makes: the bright "confirm" ding, or the refusal when the row cannot be used.
+function Ui_ConfirmSound(_m, _i) {
+    return "ui_confirm";
+}
+
 // Step + sounds + callbacks for the top menu of a stack (or a lone menu when _stk is undefined). Returns the event.
 function Ui_MenuUpdate(_m, _stk = undefined) {
     var ev = Ui_MenuStep(_m, Ui_ReadInput(), current_time);
