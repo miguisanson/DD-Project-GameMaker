@@ -14338,7 +14338,8 @@ function Scenario_StepSmokeR3Light(_s) {
 // the title Continue is on and has the cursor, New Game starts in save 2 and the intro does NOT play again; Load Game lists save 1 and 2 (3 greyed), the delete key asks, Yes
 // deletes save 2; Continue loads save 1. 1080..1086 (profiles): Q opens the profile screen, New Profile asks for a name (an empty one is refused, "ABC" is typed with the keys), the title shows
 // ABC with nothing to continue, New Game uses ABC's save 1 and the intro plays (a new profile starts fresh), the second New Game uses save 2 without the intro, Load Game lists both, the
-// delete key removes save 2; switching to Profile 1 makes Continue follow; deleting profile ABC asks and removes its files. The last step calls Scenario_NoticeEnd.
+// delete key removes save 2; switching to Profile 1 makes Continue follow; deleting profile ABC asks and removes its files. 1087..1088 (Codex): E opens the Codex of the active profile
+// from the title (the list, Run History, Back twice), the buttons' rectangles. The last step calls Scenario_NoticeEnd.
 // ============================================================================
 function Scenario_ProfilesWipe() {
     Save_DeleteFileSet(Profiles_IndexPath());
@@ -14734,8 +14735,62 @@ function Scenario_StepSmokeR3Saves2(_s) {
                     break;
                 case 84:
                     Scenario_Check("saves2_smoke_back_to_the_title", Ui_StackDepth(_sc.title_stk) == 1 && _sc.state == "main");
-                    Scenario_Next(_s, 1089);   // the Codex button steps (1087..1088) are added by the next part of the packet
+                    Scenario_Next(_s, 1087);
                     break;
+            }
+            break;
+        case 1087:   // the Codex button's key (E) opens the Codex of the active profile: the list as the Tab menu has it, Run History counts the abandoned run
+            switch (_s.t) {
+                case 2:
+                    _d.hist0 = array_length(Profile_Get().history);
+                    Scenario_Check("saves2_smoke_the_title_shows_the_codex_button", _sc.title_btn.codex.w > 0, json_stringify(_sc.title_btn));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 14:
+                    var _cx = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_the_codex_key_opens_the_codex", is_struct(_cx));
+                    if (is_struct(_cx)) {
+                        var _cr = Ui_StackTop(_cx.stk);
+                        var _ids87 = "";
+                        for (var _i = 0; _i < array_length(_cr.items); _i++) _ids87 += ((_i > 0) ? "," : "") + _cr.items[_i].id;
+                        Scenario_Check("saves2_smoke_the_codex_list_is_the_tab_menus", _cr.id == "title_codex" && _ids87 == "bestiary,notes,history,unlocks", _ids87);
+                        Scenario_Check("saves2_smoke_run_history_counts_the_runs_of_profile_1", _cr.items[2].enabled && _cr.items[2].value == string(_d.hist0) && _d.hist0 >= 1, _cr.items[2].value);
+                    }
+                    Scenario_Tap("menu_down");
+                    break;
+                case 22: Scenario_Tap("menu_down"); break;
+                case 30:
+                    var _cx2 = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_down_reaches_run_history", is_struct(_cx2) && Ui_StackTop(_cx2.stk).items[Ui_StackTop(_cx2.stk).cursor].id == "history");
+                    Scenario_Tap("confirm");
+                    break;
+                case 44:
+                    var _cx3 = Title_CodexOf(_sc);
+                    var _hp = is_struct(_cx3) ? Ui_StackTop(_cx3.stk) : undefined;
+                    Scenario_Check("saves2_smoke_run_history_opens", is_struct(_hp) && _hp.id == "codex_history" && array_length(_hp.items) == _d.hist0, is_struct(_hp) ? _hp.id : "none");
+                    Scenario_Check("saves2_smoke_the_history_row_says_it_was_abandoned", is_struct(_hp) && _hp.items[0].help == Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(_hp.items[0].lines[0].value) }), is_struct(_hp) ? _hp.items[0].help : "none");
+                    Scenario_Tap("cancel");
+                    break;
+                case 58:
+                    var _cx4 = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_back_goes_up_to_the_codex_list", is_struct(_cx4) && Ui_StackTop(_cx4.stk).id == "title_codex");
+                    Scenario_Tap("cancel");
+                    break;
+                case 72:
+                    Scenario_Check("saves2_smoke_back_at_the_list_closes_the_codex", !is_struct(Title_CodexOf(_sc)) && Ui_StackDepth(_sc.title_stk) == 1 && _sc.state == "main");
+                    Scenario_Check("saves2_smoke_looking_at_the_codex_changes_no_history", array_length(Profile_Get().history) == _d.hist0);
+                    Scenario_Next(_s, 1088);
+                    break;
+            }
+            break;
+        case 1088:   // a click on the Codex button opens it too (the mouse path: the same rectangle the draw keeps)
+            if (_s.t == 2) {
+                var _cb = _sc.title_btn.codex;
+                _d.pre = Title_ButtonHit(_sc, _cb.x + _cb.w / 2, _cb.y + _cb.h / 2);
+                Scenario_Check("saves2_smoke_the_codex_button_rectangle_is_hit_at_its_middle", _d.pre == "codex", string(_d.pre));
+                Scenario_Check("saves2_smoke_the_profile_button_rectangle_is_hit_at_its_middle", Title_ButtonHit(_sc, _sc.title_btn.profile.x + _sc.title_btn.profile.w / 2, _sc.title_btn.profile.y + _sc.title_btn.profile.h / 2) == "profile");
+                Scenario_Check("saves2_smoke_a_point_in_the_menu_hits_no_button", Title_ButtonHit(_sc, _top.rect.x + _top.rect.w / 2, _top.rect.y + _top.rect.h / 2) == "");
+                Scenario_Next(_s, 1089);
             }
             break;
         case 1089:   // the end of the chain: removes the profiles and files the steps made
@@ -14930,7 +14985,7 @@ function Scenario_S2End() {
 }
 
 function Scenario_S2Scenes() {
-    return ["title", "load", "overwrite", "profiles", "name"];
+    return ["title", "load", "overwrite", "profiles", "name", "codex", "codex_history"];
 }
 
 function Scenario_S2Langs() {
@@ -14972,6 +15027,15 @@ function Scenario_S2Setup(_scene) {
             Test_ProfPutRun(Slots_PathOf(_pid, 0), 3, 4249, CLASS_KNIGHT, 3, 2, 9000, _t);
             break;
         case "name":
+            break;
+        case "codex":   // a profile with three finished runs and two enemies met: the list has numbers, the history page has rows
+        case "codex_history":
+            Profile_RecordRun(Profile_Get(), { seed: 4301, class_id: CLASS_KNIGHT, level: 5, floor: 4, room: "rm_floor4", result: "died", cause: "Direwolf", kills: 12, gold: 40, at: 1 });
+            Profile_RecordRun(Profile_Get(), { seed: 4302, class_id: CLASS_MAGE, level: 3, floor: 2, room: "rm_floor2", result: "abandoned", cause: "abandoned", kills: 5, gold: 12, at: 2 });
+            Profile_RecordRun(Profile_Get(), { seed: 4303, class_id: CLASS_ARCHER, level: 9, floor: 7, room: "rm_floor7", result: "died", cause: "Ghost Sword", kills: 31, gold: 88, at: 3 });
+            Codex_RecordMeeting(ENEMY_SLIME, false);
+            Codex_RecordMeeting(ENEMY_DIREWOLF, true);
+            Profile_Flush();
             break;
     }
 }
@@ -15026,6 +15090,11 @@ function Scenario_StepShotsR3Saves2(_s) {
                     case "load": Title_OnConfirm(_m0, 2); break;
                     case "overwrite": Title_NewPress(_c, _m0); break;
                     case "profiles": Title_ProfileOpen(_c); break;
+                    case "codex": Title_CodexOpen(_c); break;
+                    case "codex_history":
+                        Title_CodexOpen(_c);
+                        Title_CodexPage(_c, "history");
+                        break;
                     case "name":
                         var _pm = Title_ProfileOpen(_c);
                         Title_ProfileConfirm(_pm, array_length(_pm.items) - 1);   // the New Profile row
@@ -15047,7 +15116,12 @@ function Scenario_StepShotsR3Saves2(_s) {
             var _top = Ui_StackTop(_c.title_stk);
             var _nent = (_c != noone) ? Title_NameOf(_c) : undefined;
             var _is_name = (_scene == "name");
-            if (_s.t >= 4 && (_is_name ? (is_struct(_nent) && Ui_AnimT(_nent.t, current_time) >= 1 && variable_instance_exists(_c, "title_name_rects")) : (Ui_MenuAlpha(_top, current_time) >= 1))) {
+            var _cdx = (_c != noone) ? Title_CodexOf(_c) : undefined;
+            var _is_codex = (string_pos("codex", _scene) == 1);
+            var _ready2 = _is_name ? (is_struct(_nent) && Ui_AnimT(_nent.t, current_time) >= 1 && variable_instance_exists(_c, "title_name_rects"))
+                                   : (_is_codex ? (is_struct(_cdx) && Ui_AnimT(_cdx.t, current_time) >= 1 && Ui_MenuAlpha(Ui_StackTop(_cdx.stk), current_time) >= 1 && Ui_StackTop(_cdx.stk).rect.w > 0)
+                                                : (Ui_MenuAlpha(_top, current_time) >= 1));
+            if (_s.t >= 4 && _ready2) {
                 var _mt = Ui_Metrics();
                 var _idr = Build_IdRect();
                 var _m1 = _c.title_stk.menus[0];
@@ -15063,6 +15137,22 @@ function Scenario_StepShotsR3Saves2(_s) {
                         var _pb = _c.title_btn.profile;   // D175: the profile button, lower left: inside the picture, clear of the menu, the card and the build id
                         Scenario_Check("shots_s2_title_profile_button_inside_the_gui_" + _tag, Scenario_S2Inside(_pb, _mt), json_stringify(_pb));
                         Scenario_Check("shots_s2_title_profile_button_clear_of_the_menu_the_card_and_the_build_id_" + _tag, !Test_RectsOverlap(_pb, _m1.rect) && !Test_RectsOverlap(_pb, _cr) && !Test_RectsOverlap(_pb, _idr), json_stringify(_pb) + " vs " + json_stringify(_m1.rect) + " " + json_stringify(_cr));
+                        var _cb2 = _c.title_btn.codex;   // D175: the Codex button above it
+                        Scenario_Check("shots_s2_title_codex_button_inside_the_gui_" + _tag, Scenario_S2Inside(_cb2, _mt), json_stringify(_cb2));
+                        Scenario_Check("shots_s2_title_codex_button_clear_of_the_menu_the_card_the_build_id_and_the_profile_button_" + _tag, !Test_RectsOverlap(_cb2, _m1.rect) && !Test_RectsOverlap(_cb2, _cr) && !Test_RectsOverlap(_cb2, _idr) && !Test_RectsOverlap(_cb2, _pb), json_stringify(_cb2) + " vs " + json_stringify(_pb));
+                        break;
+                    case "codex":
+                    case "codex_history":
+                        var _ct = Ui_StackTop(_cdx.stk);
+                        var _khr = _c.title_hint_rect;
+                        Scenario_Check("shots_s2_codex_is_the_expected_page_" + _tag, _ct.id == ((_scene == "codex") ? "title_codex" : "codex_history"), _ct.id);
+                        Scenario_Check("shots_s2_codex_list_inside_the_gui_" + _tag, Scenario_S2Inside(_ct.rect, _mt), json_stringify(_ct.rect));
+                        Scenario_Check("shots_s2_codex_details_inside_the_gui_" + _tag, Scenario_S2Inside(_ct.det_rect, _mt), json_stringify(_ct.det_rect));
+                        Scenario_Check("shots_s2_codex_list_and_details_do_not_overlap_" + _tag, !Test_RectsOverlap(_ct.rect, _ct.det_rect), json_stringify(_ct.rect) + " vs " + json_stringify(_ct.det_rect));
+                        Scenario_Check("shots_s2_codex_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_khr, _mt), json_stringify(_khr));
+                        Scenario_Check("shots_s2_codex_key_line_clear_of_the_panels_and_the_build_id_" + _tag, !Test_RectsOverlap(_khr, _ct.rect) && !Test_RectsOverlap(_khr, _ct.det_rect) && !Test_RectsOverlap(_khr, _idr), json_stringify(_khr));
+                        Scenario_Check("shots_s2_codex_build_id_clear_of_the_panels_" + _tag, !Test_RectsOverlap(_idr, _ct.rect) && !Test_RectsOverlap(_idr, _ct.det_rect));
+                        if (_scene == "codex_history") Scenario_Check("shots_s2_codex_history_lists_three_runs_" + _tag, array_length(_ct.items) == 3 && _ct.items[0].label == "Archer Lv 9", _ct.items[0].label);
                         break;
                     case "name":
                         var _nr = _c.title_name_rects;

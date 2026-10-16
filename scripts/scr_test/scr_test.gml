@@ -15486,6 +15486,8 @@ function Test_Suite_R3Saves2() {
     Test_RunSuite("R3Saves2.profswitch", Test_R3s2ProfSwitchRun);
     Test_RunSuite("R3Saves2.profdelete", Test_R3s2ProfDeleteRun);
     Test_RunSuite("R3Saves2.profcreate", Test_R3s2ProfCreateRun);
+    Test_RunSuite("R3Saves2.codex", Test_R3s2CodexRun);
+    Test_RunSuite("R3Saves2.buttons", Test_R3s2Buttons);
 }
 
 function Test_R3s2ItemsRun() { Test_ProfRun("tq1_", Test_R3s2Items); }
@@ -15896,4 +15898,66 @@ function Test_R3s2ProfCreate(_p) {
     Title_NameCancel(_c);
     Test_False("saves2 create: cancel closes the entry", is_struct(Title_NameOf(_c)));
     Test_Eq("saves2 create: and the profile screen is still there", Ui_StackTop(_c.title_stk).id, "profiles");
+}
+
+// ---- Part 3: the Codex and Run History from the title (read-only, the active profile's) ----
+function Test_R3s2CodexRun() { Test_ProfRun("tqe_", Test_R3s2Codex); }
+
+function Test_R3s2Codex(_p) {
+    var _c = Test_R3s2Title();
+    Test_False("saves2 codex: nothing is open to begin with", is_struct(Title_CodexOf(_c)));
+    Title_CodexOpen(_c);
+    var _cx = Title_CodexOf(_c);
+    Test_True("saves2 codex: the Codex button opens the screen", is_struct(_cx));
+    var _root = Ui_StackTop(_cx.stk);
+    Test_Eq("saves2 codex: the root is the Codex list as the Tab menu has it", Test_R3s2Ids(_root.items), "bestiary,notes,history,unlocks");
+    Test_Eq("saves2 codex: titled Codex", _root.layout.title, "Codex");
+    Test_False("saves2 codex: with no run in the history, Run History is greyed", _root.items[2].enabled);
+    Test_Eq("saves2 codex: and counts 0", _root.items[2].value, "0");
+    Profile_RecordRun(Profile_Get(), { seed: 5, class_id: CLASS_KNIGHT, level: 3, floor: 2, room: "rm_floor2", result: "died", cause: "Slime", kills: 4, gold: 9, at: 1 });
+    Profile_Flush();
+    var _c2 = Test_R3s2Title();
+    Title_CodexOpen(_c2);
+    var _r2 = Ui_StackTop(Title_CodexOf(_c2).stk);
+    Test_True("saves2 codex: one run in the history turns Run History on", _r2.items[2].enabled);
+    Test_Eq("saves2 codex: and counts 1", _r2.items[2].value, "1");
+    var _before = json_stringify(Profile_Get());
+    Test_True("saves2 codex: Run History opens", Title_CodexPage(_c2, "history"));
+    var _hm = Ui_StackTop(Title_CodexOf(_c2).stk);
+    Test_Eq("saves2 codex: the page is the Tab menu's Run History page", _hm.id, "codex_history");
+    Test_Eq("saves2 codex: one run, newest first: class and level", _hm.items[0].label, "Knight Lv 3");
+    Test_Eq("saves2 codex: it is on top of the list", Ui_StackDepth(Title_CodexOf(_c2).stk), 2);
+    Test_True("saves2 codex: the Bestiary opens", Title_CodexPage(_c2, "bestiary"));
+    Test_Eq("saves2 codex: with the ten enemies", array_length(Ui_StackTop(Title_CodexOf(_c2).stk).items), 10);
+    Test_True("saves2 codex: Notes opens", Title_CodexPage(_c2, "notes"));
+    Test_True("saves2 codex: Unlocks opens", Title_CodexPage(_c2, "unlocks"));
+    Test_Eq("saves2 codex: looking changes nothing in the profile", json_stringify(Profile_Get()), _before);
+    // it is the ACTIVE profile's: a second profile has an empty history
+    var _b = Profiles_Create("Bea");
+    Profiles_Switch(_b);
+    var _c3 = Test_R3s2Title();
+    Title_CodexOpen(_c3);
+    var _r3 = Ui_StackTop(Title_CodexOf(_c3).stk);
+    Test_Eq("saves2 codex: another profile has its own, empty history", _r3.items[2].value, "0");
+    Test_False("saves2 codex: a page with nothing in it does not open", Title_CodexPage(_c3, "history"));
+    Test_Eq("saves2 codex: the list stays", Ui_StackDepth(Title_CodexOf(_c3).stk), 1);
+    Profiles_Switch(0);
+    var _c4 = Test_R3s2Title();
+    Title_CodexOpen(_c4);
+    Test_Eq("saves2 codex: back on the first profile its run is counted again", Ui_StackTop(Title_CodexOf(_c4).stk).items[2].value, "1");
+    // Back from the list closes the screen
+    Title_CodexOnBack(Ui_StackTop(Title_CodexOf(_c4).stk), "root");
+    Test_False("saves2 codex: Back at the list closes the Codex", is_struct(Title_CodexOf(_c4)));
+    Test_Eq("saves2 codex: the title is still there", Ui_StackDepth(_c4.title_stk), 1);
+}
+
+// Which corner button a point is on (pure: the rectangles the draw keeps in title_btn).
+function Test_R3s2Buttons() {
+    var _c = { title_btn: { profile: { x: 10, y: 100, w: 60, h: 30 }, codex: { x: 10, y: 60, w: 50, h: 30 } } };
+    Test_Eq("saves2 buttons: a point on the profile button", Title_ButtonHit(_c, 20, 110), "profile");
+    Test_Eq("saves2 buttons: a point on the codex button", Title_ButtonHit(_c, 20, 70), "codex");
+    Test_Eq("saves2 buttons: a point on neither", Title_ButtonHit(_c, 200, 200), "");
+    Test_Eq("saves2 buttons: the right and bottom edges are outside", Title_ButtonHit(_c, 70, 110) + Title_ButtonHit(_c, 20, 130), "");
+    var _z = { title_btn: { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } } };
+    Test_Eq("saves2 buttons: a button that was not drawn is not hit", Title_ButtonHit(_z, 0, 0), "");
 }
