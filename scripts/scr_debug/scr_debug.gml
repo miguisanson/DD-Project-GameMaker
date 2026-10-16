@@ -11877,7 +11877,7 @@ function Scenario_StepSmokeClassMem(_s) {
         case 757:   // the end of the run: the profile on disk holds the memory
             if (_s.t == 2) {
                 var _disk = Profile_Load(Profile_Path());
-                Scenario_Check("classmem_the_profile_file_holds_the_memory", _disk.status == "ok" && _disk.profile.profile_version == 2 && Profile_SkillKnown(_disk.profile, SKILL_WOUND) && Profile_SkillKnown(_disk.profile, SKILL_HILT_BASH) && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL));
+                Scenario_Check("classmem_the_profile_file_holds_the_memory", _disk.status == "ok" && _disk.profile.profile_version == PROFILE_VERSION && Profile_SkillKnown(_disk.profile, SKILL_WOUND) && Profile_SkillKnown(_disk.profile, SKILL_HILT_BASH) && Profile_SkillKnown(_disk.profile, SKILL_FIREBALL));
                 Scenario_Next(_s, 890);   // goes on with H12a (890..909), then H13a (790..), the end of the chain
             }
             break;
@@ -15257,7 +15257,7 @@ function Scenario_StepSmokeChoices(_s) {
                     Scenario_Check("choices_merchant_the_second_reply_is_his_next_line", json_stringify(_c.boxes[1].lines) == json_stringify(Choice_Def("merchant").reply[1]) && !_c.boxes[1].asking && _c.boxes[1].speaker == _c.boxes[0].speaker, json_stringify(_c.boxes[1].lines));
                     Scenario_Check("choices_merchant_the_answer_is_remembered", Choice_Get(Profile_Get(), "merchant") == 2);
                     var _disk = Profile_Load(Profile_Path());
-                    Scenario_Check("choices_merchant_the_answer_is_in_the_profile_file", _disk.status == "ok" && Choice_Get(_disk.profile, "merchant") == 2 && _disk.profile.profile_version == 2, "status=" + _disk.status);
+                    Scenario_Check("choices_merchant_the_answer_is_in_the_profile_file", _disk.status == "ok" && Choice_Get(_disk.profile, "merchant") == 2 && _disk.profile.profile_version == PROFILE_VERSION, "status=" + _disk.status);
                     Scenario_Check("choices_merchant_the_shop_waits_for_the_reply", !ShopUi_IsOpen());
                     _h.reply2 = json_stringify(_c.boxes[1].lines);
                 }

@@ -14693,6 +14693,7 @@ function Test_ProfDeleteAll(_path) {
     for (var _t = 0; _t < array_length(_tails); _t++) {
         Save_DeleteFileSet(_path + _tails[_t]);
     }
+    if (file_exists(_path + ".bak.pre-profiles")) file_delete(_path + ".bak.pre-profiles");
     var _kept = RunSave_KeptFiles(_path);
     for (var _k = 0; _k < array_length(_kept); _k++) Save_DeleteFileSet(_kept[_k]);
 }
@@ -15168,7 +15169,7 @@ function Test_ProfRunSummary() {
     var _old_run = _had_run ? _gs.run : undefined;
     var _old_cp = _gs.checkpoint;
     _gs.run = Run_Create(12345);
-    _gs.run.stats.play_ms = 61000;
+    RunStats_Of(_gs.run).play_ms = 61000;
     var _pl = CharacterCreate_Player(CLASS_MAGE);
     _pl.level = 3;
     _gs.player_ch = _pl;
