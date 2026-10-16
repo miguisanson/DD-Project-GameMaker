@@ -1251,7 +1251,7 @@ function Skill_Use(_user, _target, _skill_id, _grade_mult = 1) {
         _target.inventory = Inv_Remove(_target.inventory, stolen_id, 1);
         _user = Skill_StealRecord(_user, stolen_id, 1);
         if (is_struct(stolen_item) && variable_struct_exists(stolen_item, "name")) {
-            result.msg = Loc_T("combat.msg.stole_item", "Stole {item}.", { item: string(stolen_item.name) });
+            result.msg = Loc_T("combat.msg.stole_item", "Stole {item}.", { item: Item_NameMarked(stolen_id) });
         } else {
             result.msg = Loc_T("combat.msg.stole_an_item", "Stole an item.");
         }

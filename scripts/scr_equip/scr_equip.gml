@@ -56,7 +56,7 @@ function Equip_CanEquip(_ch, _item_or_id) {
     }
 
     out.ok = true;
-    out.msg = Loc_T("menu.msg.equipped", "Equipped {item}.", { item: string(item.name) });
+    out.msg = Loc_T("menu.msg.equipped", "Equipped {item}.", { item: Item_NameMarked(item.id) });
     return out;
 }
 

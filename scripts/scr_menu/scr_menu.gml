@@ -255,7 +255,7 @@ function TabGear_Row(_ch, _item, _slot, _worn) {
     var sentence = Item_Sentence(_item, _ch);
     if (!_worn && !can.ok) sentence += " " + can.msg;
     var cur_id = _worn ? 0 : Equip_SlotGet(_ch, string(_item.equip_slot));
-    if (!_worn && can.ok && cur_id != 0) sentence += " " + Loc_T("tab.gear.replaces", "Replaces {item}.", { item: ItemDB_Get(cur_id).name });
+    if (!_worn && can.ok && cur_id != 0) sentence += " " + Loc_T("tab.gear.replaces", "Replaces {item}.", { item: Item_NameMarked(cur_id) });
     return {
         id: "gear_" + string(_item.id), label: _item.name, value: "", kind: "button", enabled: true, item_id: _item.id, slot: _slot, worn: _worn,
         dim: (!_worn && !can.ok), help: sentence, lines: _worn ? Item_NumberLines(_item, _ch) : Gear_CompareLines(_ch, _item), icon_item: _item,
@@ -311,7 +311,7 @@ function Gear_Toggle(_ch, _item_id, _in_battle = false) {
         Equip_SlotSet(_ch, slot, 0);
         out.ch = RecomputeResources(_ch);
         out.ok = true;
-        out.msg = Loc_T("menu.msg.unequipped", "Unequipped {item}.", { item: item.name });
+        out.msg = Loc_T("menu.msg.unequipped", "Unequipped {item}.", { item: Item_NameMarked(item.id) });
         return out;
     }
     var can = Equip_CanEquip(_ch, item);
@@ -1421,13 +1421,13 @@ function Menu_Draw() {
     Confirm_Draw();   // D156: Abandon run and Quit to title ask over the whole menu
     Notice_Draw();   // R3 note 25: the notice after a Controls reset, over the menu (the controller's own Notice_Draw is not reached while the menu is up)
     if (u.toast != "" && now - u.toast_ms < TAB_TOAST_MS) {
-        var tw = UI_TextWidth(u.toast) + 8 * p;
+        var tw = Ui_LineWidth(u.toast) + 8 * p;
         var th = mt.line_h + 6 * p;
         var tx = round((mt.gw - tw) / 2);
         var ty = z.foot_y - 2 * p - th;
         Ui_DrawFrame(tx, ty, tw, th, a, p);
         draw_set_alpha(a);
-        Ui_Text(tx + 4 * p, ty + 3 * p, u.toast, UI_C_LIGHTEST);
+        Ui_LineDraw(tx + 4 * p, ty + 3 * p, u.toast, tw - 8 * p, UI_C_LIGHTEST);
     }
     draw_set_alpha(1);
     draw_set_color(c_white);
@@ -1659,7 +1659,7 @@ function CardsUi_EchoMenu() {
 
 // The name of what an echo option gives (a skill's or an item's), for the question.
 function CardsUi_EchoName(_o) {
-    return (_o.kind == "skill") ? SkillDB_Get(_o.id).name : ItemDB_Get(_o.id).name;
+    return (_o.kind == "skill") ? SkillDB_Get(_o.id).name : Item_NameMarked(_o.id);   // D178: an item's name in its rarity colour (the question is drawn with markup)
 }
 
 function CardsUi_EchoConfirm(_m, _i) {
@@ -2710,7 +2710,7 @@ function ShopUi_BuyConfirm(_m, _i) {
         return;
     }
     CardsUi_Commit(r.ch);
-    ShopUi_Say("bought", { name: it.label, price: string(r.price) }, "buy");
+    ShopUi_Say("bought", { name: (it.row.kind == "item") ? Item_NameMarked(it.row.id) : it.label, price: string(r.price) }, "buy");   // D178: an item's name in its rarity colour
     ShopUi_Refresh(_m, "buy");
 }
 
@@ -2722,7 +2722,7 @@ function ShopUi_SellConfirm(_m, _i) {
     var def = ItemDB_Get(it.item_id);
     var gear = (def.type == ITEM_WEAPON || def.type == ITEM_ARMOR || def.type == ITEM_ACCESSORY);
     if (gear && !Menu_IsEquipped(gs.player_ch, it.item_id)) {
-        Confirm_Open(Loc_T("confirm.sell", "Sell {name} for {price}?", { name: def.name, price: string(Shop_SellPrice(it.item_id)) }), ShopUi_SellYes, { menu: _m, item_id: it.item_id });
+        Confirm_Open(Loc_T("confirm.sell", "Sell {name} for {price}?", { name: Item_NameMarked(def.id), price: string(Shop_SellPrice(it.item_id)) }), ShopUi_SellYes, { menu: _m, item_id: it.item_id });
         return;
     }
     ShopUi_SellNow(_m, it.item_id);
@@ -2741,7 +2741,7 @@ function ShopUi_SellNow(_m, _item_id) {
         return;
     }
     CardsUi_Commit(r.ch);
-    ShopUi_Say("sold", { name: ItemDB_Get(_item_id).name, price: string(r.gold) }, "sell");
+    ShopUi_Say("sold", { name: Item_NameMarked(_item_id), price: string(r.gold) }, "sell");
     ShopUi_Refresh(_m, "sell");
 }
 
@@ -2788,7 +2788,7 @@ function ShopUi_DrawPlate(_line1, _line2, _alpha = 1) {
     if (_line2 != "") array_push(lines, _line2);
     if (array_length(lines) == 0) return;
     var tw = 0;
-    for (var i = 0; i < array_length(lines); i++) tw = max(tw, UI_TextWidth(lines[i]));
+    for (var i = 0; i < array_length(lines); i++) tw = max(tw, Ui_LineWidth(lines[i]));
     tw = min(tw + 8 * p, mt.gw - 2 * mt.margin);
     var th = array_length(lines) * mt.line_h + (array_length(lines) - 1) * p + 6 * p;
     var mx0 = round((mt.gw - tw) / 2);
@@ -2796,7 +2796,7 @@ function ShopUi_DrawPlate(_line1, _line2, _alpha = 1) {
     Ui_DrawFrame(mx0, my0, tw, th, _alpha, p);
     for (var j = 0; j < array_length(lines); j++) {
         var col = (j == 0 || array_length(lines) == 1) ? UI_C_LIGHTEST : UI_C_LIGHT;   // the information first, the merchant's line under it in the accent colour
-        Ui_Text(mx0 + 4 * p, my0 + 3 * p + j * (mt.line_h + p), Ui_FitText(lines[j], tw - 8 * p), col);
+        Ui_LineDraw(mx0 + 4 * p, my0 + 3 * p + j * (mt.line_h + p), lines[j], tw - 8 * p, col);
     }
 }
 
@@ -2898,12 +2898,49 @@ function Item_GlyphRows(_item) {
     return [];
 }
 
-// Draws the icon of an item in a square of _size pixels (GUI units) at (_x, _y).
+// ---- the rarity gem (D178): a 3 x 3 diamond at the top-right corner of a Rare or Epic item's icon. 'g' gold, 'd' dark (the corners, so the gold reads on any picture), 'l' the
+// lightest gold. Rare: a gold plus on dark corners. Epic: the same, then (the second frame, every 300 ms) a pale star: the whole 3 x 3 in the light gold with the centre gold.
+function Rarity_GemFrame(_now = undefined) {
+    var t = is_undefined(_now) ? Rarity_Clock() : _now;
+    return (t div 300) mod 2;
+}
+
+// The gem's 3 rows of 3 characters for the rarity and frame (0 or 1); no rows for Common.
+function Rarity_GemRows(_r, _frame) {
+    if (_r < 2) return [];
+    if (_r >= 3 && _frame == 1) return ["lll", "lgl", "lll"];
+    return ["dgd", "ggg", "dgd"];
+}
+
+function Rarity_GemColor(_ch) {
+    if (_ch == "g") return UI_C_MERCHANT_GOLD;
+    if (_ch == "l") return UI_C_RARITY_EPIC;
+    return UI_C_DARKEST;
+}
+
+// Draws the gem of a _size pixel icon whose top-left is (_x, _y): its top-right corner sits on the icon's top-right corner; one gem cell is one pixel of the 16 x 16 icon picture
+// (a whole number of GUI units, at least 1), so the gem is about a fifth of the icon wide.
+function Rarity_DrawGem(_x, _y, _size, _r, _alpha = 1) {
+    var rows = Rarity_GemRows(_r, Rarity_GemFrame());
+    if (array_length(rows) <= 0) return;
+    var u = max(1, floor((_size + 8) / 16));
+    var gx = _x + _size - 3 * u;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(_alpha);
+    for (var r = 0; r < 3; r++) {
+        for (var c = 0; c < 3; c++) Ui_Box(gx + c * u, _y + r * u, gx + (c + 1) * u, _y + (r + 1) * u, Rarity_GemColor(string_char_at(rows[r], c + 1)));
+    }
+    draw_set_alpha(a0);
+}
+
+// Draws the icon of an item in a square of _size pixels (GUI units) at (_x, _y), with its rarity gem on the top-right corner (Rare and Epic).
 function Item_DrawIcon(_item, _x, _y, _size, _alpha = 1) {
     var ic = Item_IconSprite(_item);
+    var rar = (is_struct(_item) && variable_struct_exists(_item, "id")) ? Item_Rarity(_item.id) : 1;
     if (ic.spr != noone) {
         var sc = _size / max(1, max(sprite_get_width(ic.spr), sprite_get_height(ic.spr)));
         draw_sprite_ext(ic.spr, ic.sub, _x, _y, sc, sc, 0, c_white, _alpha);
+        Rarity_DrawGem(_x, _y, _size, rar, _alpha);
         return;
     }
     var rows = Item_GlyphRows(_item);
@@ -2920,6 +2957,7 @@ function Item_DrawIcon(_item, _x, _y, _size, _alpha = 1) {
         }
     }
     draw_set_alpha(a0);
+    Rarity_DrawGem(_x, _y, _size, rar, _alpha);
 }
 
 // --------------------
@@ -3901,7 +3939,8 @@ function Focus_Step(_has_focus) {
 #macro UI_C_LIGHT $6CC086        // #86C06C
 #macro UI_C_LIGHTEST $CFF8E0     // #E0F8CF
 #macro UI_C_TERM $6CC086        // #86C06C (D149): a game term in a sentence ([t]..[/t]): the palette's bright green, drawn as asked on the white main text
-#macro UI_C_ACCENT $47C5E8      // #E8C547 (D149): the one accent ([a]..[/a]): BREAK, Perfect and a newly received item only (the merchant gold of D113)
+#macro UI_C_ACCENT $47C5E8      // #E8C547 (D149): the one accent ([a]..[/a]): BREAK and Perfect only (the merchant gold of D113)
+#macro UI_C_RARITY_EPIC $A0E6F6  // #F6E6A0 (D178): the lightest gold an Epic item's name and gem pulse to (the Rare gold is UI_C_MERCHANT_GOLD)
 #macro UI_C_TEXT $FFFFFF         // #FFFFFF (D115): item names and list / name text are white; frames, bars and accents keep the four palette colours
 #macro UI_REPEAT_DELAY_MS 300    // D95: hold this long before the list starts to scroll
 #macro UI_REPEAT_START_MS 140    // the first repeat gap; each next one is 20 percent shorter ...
@@ -4369,6 +4408,15 @@ function Ui_RowStyle(_row, _sel = false) {
     return { text: Ui_RowColor(_sel, Ui_ItemEnabled(_row), dim), strip: -1, rule: -1 };
 }
 
+// D178: the colour of a row's NAME. An item row (it carries icon_item) shows its name in the item's rarity colour (Common white, Rare gold, Epic pulsing gold) unless the row is
+// dim (cannot use / empty / too expensive: the light green) or disabled (the dark green); every other row is as Ui_RowStyle says. The value column keeps the row colour.
+function Ui_RowLabelColor(_row, _sel = false) {
+    var st = Ui_RowStyle(_row, _sel);
+    if (st.text != UI_C_TEXT) return st.text;
+    if (variable_struct_exists(_row, "icon_item") && is_struct(_row.icon_item) && variable_struct_exists(_row.icon_item, "id")) return Rarity_Color(Item_Rarity(_row.icon_item.id));
+    return st.text;
+}
+
 // The header's place inside its row: the whole width, a gap of one pixel unit above it unless it is the first row of the list. Pure. { x, y, w, h }
 function Ui_HeadRect(_x1, _x2, _ry, _row_h, _p, _first) {
     var gap = _first ? 0 : _p;
@@ -4567,6 +4615,28 @@ function Ui_FitText(_txt, _max_w) {
     if (UiFit_On()) UiFit_Fail("cut", t, _max_w, UI_TextWidth(t));   // H13b (D156): a cut is a fit failure
     while (string_length(t) > 1 && UI_TextWidth(t + "..") > _max_w) t = string_copy(t, 1, string_length(t) - 1);
     return t + "..";
+}
+
+// D178: the width of one line of text as it is drawn: a line with markup (an item's name in its rarity colour) by its words, a plain line by the font.
+function Ui_LineWidth(_txt) {
+    var t = string(_txt);
+    if (Prompt_HasTokens(t)) return Markup_Width(t);
+    return UI_TextWidth(t);
+}
+
+// One line at (_x, _y) in _w, in _col; with markup the item names keep their colour (Markup_DrawLine). _halign fa_left or fa_center (centred on _x). A line wider than _w is cut
+// plain with ".." as before (Ui_FitText). Returns the width drawn.
+function Ui_LineDraw(_x, _y, _txt, _w, _col, _halign = fa_left) {
+    var t = string(_txt);
+    if (!Prompt_HasTokens(t) || Markup_Width(t) > _w) {
+        var ft = Ui_FitText(t, _w);
+        Ui_Text(_x, _y, ft, _col, _halign);
+        return UI_TextWidth(ft);
+    }
+    var w = Markup_Width(t);
+    var x0 = (_halign == fa_center) ? round(_x - w / 2) : _x;
+    Markup_DrawLine(x0, _y, t, Ui_TextColor(_col), draw_get_alpha());
+    return w;
 }
 
 // ---- H13b (D156): THE "text fits" check ---------------------------------------------------------------------------------------
@@ -5438,6 +5508,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         var dim = variable_struct_exists(row, "dim") && row.dim;   // looks unavailable but can be selected (a shop row you cannot pay for, a skill you lack the MP for)
         var style = Ui_RowStyle(row, sel);   // D115: names are white, selected or not; R3: a header is a dark strip with pale text
         var col = style.text;
+        var lcol = Ui_RowLabelColor(row, sel);   // D178: an item's name in its rarity colour (not on a dim row)
         var hr = undefined;
         if (kd == "head") {   // R-106 follow-up: no fill (the cursor band is the dark green); the text, then a thin rule to the right edge of the list (below)
             hr = Ui_HeadRect(px + 3 * p, px + panel_w - 3 * p, ry, mt.row_h, p, k == 0);
@@ -5445,6 +5516,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         } else if (variable_struct_exists(row, "flash_at") && Ui_FlashOn(now - row.flash_at)) {   // R3 note 25: the Controls rows a reset changed blink
             Ui_Box(px + 3 * p, ry, px + panel_w - 3 * p, ry + rh, UI_C_LIGHTEST);
             col = UI_C_DARKEST;
+            lcol = col;
         }
         var label_x = x0 + 5 * p;
         if (icon_px > 0) {   // { cat, frame }: an Icon_Get picture (skills, statuses)
@@ -5467,14 +5539,14 @@ function Ui_MenuDraw(_m, _alpha = 1) {
         } else if (is_struct(fit) && fit.ok && fit.mode != "one") {   // wrapped over two lines or a step smaller; a stacked row has its value on a line under the label
             stacked = (fit.mode == "stack");
             var lby = stacked ? (ry + p + fit.y_off) : (ry + (rh - fit.h) div 2 + fit.y_off);
-            Ui_TextBlockStep(label_x, lby, row.label, fit.room, col, fit.step);
+            Ui_TextBlockStep(label_x, lby, row.label, fit.room, lcol, fit.step);
             if (stacked) vty = ry + fit.value_y;
         } else {
             if (!is_struct(fit) || !fit.ok) {   // a row no layout fits (a head row, or the last resort): ".." before it reaches the value
                 var vroom = Ui_MenuLabelRoom(panel_w, p, icon_px, variable_struct_exists(row, "icon_item"), variable_struct_exists(row, "value") ? row.value : "");
                 shown_label = Ui_FitText(row.label, vroom);
             }
-            Ui_Text(label_x, ty, shown_label, col);
+            Ui_Text(label_x, ty, shown_label, lcol);
         }
         if (is_struct(hr) && style.rule != -1 && !L.center) {   // the header's rule: 1 px, from the end of the text to the right edge of the list, level with the middle of the text
             var rule_x = label_x + UI_TextWidth(row.label) + 2 * p;

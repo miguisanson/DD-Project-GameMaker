@@ -876,7 +876,9 @@ function Prompt_Text(_action, _device = undefined) {
 // H8b (D149, D156): the text markup. One parser (Markup_Parse), one layout (Prompt_RichLayout) and one drawer (Prompt_RichDraw / Markup_DrawLine)
 // serve every place that shows sentences: the dialogue box, cards, tooltips, notes, tutorials, hints. The rules for writers are in docs/text-markup.md.
 //   [t]Poison[/t]   a game term, in the palette's bright green (UI_C_TERM)
-//   [a]BREAK[/a]    the one accent, merchant gold #E8C547 (UI_C_ACCENT): only BREAK, Perfect and a newly received item
+//   [a]BREAK[/a]    the one accent, merchant gold #E8C547 (UI_C_ACCENT): only BREAK and Perfect
+//   [r1]..[/r1] [r2]..[/r2] [r3]..[/r3]   an item's name in its rarity colour (D178): Common white, Rare gold, Epic gold that pulses lighter. Written only by Item_NameMarked,
+//                   never in the workbook
 //   [k:confirm]     the button for an action, by the device used last: a key name (arrows for the move keys) or a pad glyph
 //   {confirm}       the older spelling of [k:confirm], still read
 // Tags do not nest. A tag that is not closed, nested, unknown or stray is dropped and its text stays; no bracket ever reaches the screen.
@@ -892,16 +894,22 @@ function Prompt_IsAction(_name) {
     return false;
 }
 
-// What the text between "[" and "]" is: "t" / "a" (opening tags), "/t" / "/a" (closing), "k:<action>" (a button), "?" (shaped like a tag but not one we
-// know: dropped), "" (not a tag at all: plain text, e.g. "[ b ]").
+// True for the three item tags (D178): the rarity of the item the name belongs to.
+function Markup_IsItemTag(_name) {
+    return _name == "r1" || _name == "r2" || _name == "r3";
+}
+
+// What the text between "[" and "]" is: "t" / "a" / "r1" / "r2" / "r3" (opening tags), "/t" / "/a" / "/r1".. (closing), "k:<action>" (a button), "?" (shaped like a
+// tag but not one we know: dropped), "" (not a tag at all: plain text, e.g. "[ b ]").
 function Markup_TagKind(_inner) {
     var n = string_length(_inner);
     if (n == 0) return "";
     var i = (string_char_at(_inner, 1) == "/") ? 2 : 1;
     var j = i;
+    var digits_ok = (string_char_at(_inner, i) == "r");   // only the item tags have a digit in their name
     while (j <= n) {
         var c = ord(string_char_at(_inner, j));
-        if (c >= 97 && c <= 122) j++; else break;
+        if ((c >= 97 && c <= 122) || (digits_ok && j > i && c >= 48 && c <= 57)) j++; else break;
     }
     if (j == i) return "";
     var nm = string_copy(_inner, i, j - i);
@@ -915,9 +923,16 @@ function Markup_TagKind(_inner) {
             if (!((ac >= 97 && ac <= 122) || ac == 95)) return "";
         }
     }
-    if (i == 2) return (nm == "t" || nm == "a") ? "/" + nm : "?";
+    if (i == 2) return (nm == "t" || nm == "a" || Markup_IsItemTag(nm)) ? "/" + nm : "?";
     if (arg != "") return (nm == "k" && Prompt_IsAction(arg)) ? "k:" + arg : "?";
-    return (nm == "t" || nm == "a") ? nm : "?";
+    return (nm == "t" || nm == "a" || Markup_IsItemTag(nm)) ? nm : "?";
+}
+
+// The style a span of text gets from its opening tag: "term", "accent", or "r1" / "r2" / "r3" for an item's name.
+function Markup_StyleOf(_kind) {
+    if (_kind == "t") return "term";
+    if (_kind == "a") return "accent";
+    return _kind;
 }
 
 // True when the text holds anything shaped like a tag.
@@ -934,7 +949,7 @@ function Markup_HasTag(_s) {
 }
 
 // "Press [k:confirm] to go, [t]Poison[/t] hurts" -> [{ kind: "text", s: "Press ", st: "" }, { kind: "action", s: "confirm" }, { kind: "text", s: " to go, ", st: "" },
-// { kind: "text", s: "Poison", st: "term" }, ...]. st is "", "term" or "accent". _problems (an array, optional) collects a word for everything dropped.
+// { kind: "text", s: "Poison", st: "term" }, ...]. st is "", "term", "accent" or "r1" / "r2" / "r3" (an item's name, D178). _problems (an array, optional) collects a word for everything dropped.
 function Markup_Parse(_text, _problems = undefined) {
     var out = [];
     var s = string(_text);
@@ -969,14 +984,14 @@ function Markup_Parse(_text, _problems = undefined) {
         }
         buf += string_copy(s, 1, o - 1);
         var after = string_delete(rest, 1, c);
-        if (kind == "t" || kind == "a") {
+        if (kind == "t" || kind == "a" || Markup_IsItemTag(kind)) {
             var cp = string_pos("[/" + kind + "]", after);
             var body = (cp > 0) ? string_copy(after, 1, cp - 1) : "";
             if (cp > 0 && !Markup_HasTag(body)) {
                 if (buf != "") array_push(out, { kind: "text", s: buf, st: "" });
                 buf = "";
-                if (body != "") array_push(out, { kind: "text", s: body, st: (kind == "t") ? "term" : "accent" });
-                s = string_delete(after, 1, cp + 3);
+                if (body != "") array_push(out, { kind: "text", s: body, st: Markup_StyleOf(kind) });
+                s = string_delete(after, 1, cp + 2 + string_length(kind));
                 continue;
             }
             if (is_array(_problems)) array_push(_problems, (cp > 0) ? ("nested [" + kind + "]") : ("unclosed [" + kind + "]"));
@@ -1024,10 +1039,14 @@ function Prompt_TokensHaveAction(_toks) {
     return false;
 }
 
-// The colour a styled span is drawn in: terms in the palette's bright green, the accent in merchant gold, everything else in _base.
+// The colour a styled span is drawn in: terms in the palette's bright green, the accent in merchant gold, an item's name in its rarity colour (D178: Common white,
+// Rare gold, Epic gold that pulses), everything else in _base.
 function Markup_Colour(_style, _base) {
     if (_style == "term") return UI_C_TERM;
     if (_style == "accent") return UI_C_ACCENT;
+    if (_style == "r1") return Rarity_Color(1);
+    if (_style == "r2") return Rarity_Color(2);
+    if (_style == "r3") return Rarity_Color(3);
     return _base;
 }
 
@@ -1075,6 +1094,7 @@ function Markup_Length(_text) {
 function Markup_Serialise(_s, _style) {
     if (_style == "term") return "[t]" + _s + "[/t]";
     if (_style == "accent") return "[a]" + _s + "[/a]";
+    if (Markup_IsItemTag(_style)) return "[" + _style + "]" + _s + "[/" + _style + "]";
     return _s;
 }
 

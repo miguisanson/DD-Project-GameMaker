@@ -24,7 +24,7 @@ $GameModes = @(
     @{ Name = 'runtests'; Flag = '-runtests'; Timeout = 30;  Impl = $true;  Strict = $true  }
     @{ Name = 'smoke';    Flag = '-smoke';    Timeout = 740;  Impl = $true;  Strict = $false }
     @{ Name = 'bot';      Flag = '-bot';      Timeout = 480; Impl = $true;  Strict = $false }
-    @{ Name = 'shots';    Flag = '-shots';    Timeout = 480; Impl = $true;  Strict = $false; Shots = 339 }   # Shots = number of [SHOT] lines required. (R3 cards +9, R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6. H1: pause-menu pictures -2, one-menu +6. H2 +6. H6 +4. H14 +10. H7 +6. H5 +6. H13a +6. D164 +6. H8a +11. H8b +10. H12a +4, note ask +2. R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6.)
+    @{ Name = 'shots';    Flag = '-shots';    Timeout = 600; Impl = $true;  Strict = $false; Shots = 354 }   # Shots = number of [SHOT] lines required. (R3 cards +9, R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6. H1: pause-menu pictures -2, one-menu +6. H2 +6. H6 +4. H14 +10. H7 +6. H5 +6. H13a +6. D164 +6. H8a +11. H8b +10. H12a +4, note ask +2. R3 menus +14, R3 bvis +10, R3 textfit2 +14, R3 stealth +6. R3 rarity +15.)
     @{ Name = 'exportdata'; Flag = '-exportdata'; Timeout = 60; Impl = $true;  Strict = $false; Export = $true; Explicit = $true }   # B1: the game's classes/enemies/skills/items/statuses/level table as JSON -> <WorkRoot>\export\export_data.json. Run with -Only exportdata.
     @{ Name = 'gridshots'; Flag = '-gridshots'; Timeout = 120; Impl = $true;  Strict = $false; Shots = 11; ShotDir = 'gridshots'; Explicit = $true }   # D65: 16 px grid over every floor room -> <WorkRoot>\gridshots. Not part of -Mode full: run with -Only gridshots.
 )

@@ -2653,7 +2653,7 @@ function Test_Suite_Loc() {
     _k.inventory = Inv_Add(_k.inventory, 2, 1);
     var _can = Equip_CanEquip(_k, 2);
     Test_True("LOC-03 Equip_CanEquip owned weapon is ok", _can.ok);
-    Test_Eq("LOC-03 Equip_CanEquip success text (en)", _can.msg, "Equipped " + string(_can.item.name) + ".");
+    Test_Eq("LOC-03 Equip_CanEquip success text (en)", _can.msg, "Equipped " + Item_NameMarked(_can.item.id) + ".");
     // Auto-resolve result line: exp, level up, loot.
     var _msg = Enemy_AutoResolveBuildMessage({ name: "Slime" }, { exp_gain: 5, levels_gained: 1, loot_gained: true });
     Test_Eq("LOC-03 auto-resolve line (en)", _msg, "You overpower Slime. (+5 EXP) Level up x1! Loot gained.");
@@ -10932,7 +10932,7 @@ function Test_ConfirmClassAndEcho() {
     var _em = CardsUi_EchoMenu();
     CardsUi_EchoConfirm(_em, 0);
     Test_True("H2 picking an echo opens the pop-up", Confirm_IsOpen());
-    Test_Eq("H2 the echo question names the echo", Confirm_Question(), "Keep " + ItemDB_Get(11).name + " as your echo?");
+    Test_Eq("H2 the echo question names the echo", Confirm_Question(), "Keep " + Item_NameMarked(11) + " as your echo?");
     Test_Eq("H2 the echo pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the echo is not taken before Yes", Inv_Count(GameState_Get().player_ch.inventory, 11), _inv0);
     Test_Eq("H2 and the offer is still there", array_length(GameState_Get().player_ch.echo_offer), 1);
@@ -11000,7 +11000,7 @@ function Test_ConfirmSell() {
     var _price = Shop_SellPrice(_gear);
     ShopUi_SellConfirm(_m, _ig);
     Test_True("H2 selling gear opens the pop-up", Confirm_IsOpen());
-    Test_Eq("H2 the sell question names the gear and the price", Confirm_Question(), "Sell " + ItemDB_Get(_gear).name + " for " + string(_price) + "?");
+    Test_Eq("H2 the sell question names the gear and the price", Confirm_Question(), "Sell " + Item_NameMarked(_gear) + " for " + string(_price) + "?");
     Test_Eq("H2 the sell pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_Eq("H2 the gear is still in the bag before Yes", Inv_Count(GameState_Get().player_ch.inventory, _gear), 1);
     Test_Eq("H2 and the gold is the same", _gs.run.gold, 10);
@@ -12670,7 +12670,7 @@ function Test_Suite_RichText() {
     var _acc_bad = "";
     var _par_bad = "";
     var _pats = ["A/D", "W/S", "WASD", "A / D", "Up / Down", "Left / Right", "Press Z", "Press X", "Press Space", "Press Enter", "Press Esc"];
-    var _allowed = ["BREAK", "Perfect", "{item}"];
+    var _allowed = ["BREAK", "Perfect"];   // D178: a received item is no longer an accent: its name carries its rarity tag
     for (var _k = 0; _k < array_length(_keys); _k++) {
         var _e = variable_struct_get(Loc_GetData().strings, _keys[_k]);
         if (!is_struct(_e)) continue;
@@ -12684,7 +12684,7 @@ function Test_Suite_RichText() {
     }
     Test_Eq("RT no English string names keys as letters or slashes", _bad, "");
     Test_Eq("RT every English and Korean string has well-formed markup", _problems, "");
-    Test_Eq("RT [a] holds only BREAK, Perfect or a received item", _acc_bad, "");
+    Test_Eq("RT [a] holds only BREAK or Perfect", _acc_bad, "");
     Test_Eq("RT English and Korean carry the same accents and buttons", _par_bad, "");
     Test_True("RT the key terms are marked in English (tutorial, status, stat text)", array_length(Test_RT_Spans(Loc_T("tutorial.stagger.body"), "accent")) >= 1 && array_length(Test_RT_Spans(Loc_T("status.desc.poison"), "term")) >= 1 && array_length(Test_RT_Spans(Loc_T("menu.tooltip.stat.atk.desc"), "term")) >= 1);
     Test_True("RT the button mentions are button markup", Test_RT_Count(Loc_T("tutorial.bar.body"), "glyph") >= 1 && Test_RT_Count(Loc_T("tutorial.arrows.body"), "glyph") == 4 && Test_RT_Count(Loc_T("runflow.continue"), "glyph") == 1);
@@ -14331,11 +14331,11 @@ function Test_Hunt7FeelText() {
     var _loot = [{ item_id: 31, qty: 1 }];
     Loc_SetLanguage("en");
     var _en = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
-    Test_Eq("hunt7feel text: the English loot line", _en[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: the English loot line", _en[0].text, "Loot: " + Item_NameMarked(31, 1));
     Loc_SetLanguage("ko");
     var _ko = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
-    Test_Eq("hunt7feel text: the Korean loot line has a space after the colon", _ko[0].text, "전리품: " + string(ItemDB_Get(31).name) + " x1");
-    Test_Eq("hunt7feel text: a prefix that already ends in a space gets no second one", Loot_BuildMessageEntries(_loot, "Loot: ")[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: the Korean loot line has a space after the colon", _ko[0].text, "전리품: " + Item_NameMarked(31, 1));
+    Test_Eq("hunt7feel text: a prefix that already ends in a space gets no second one", Loot_BuildMessageEntries(_loot, "Loot: ")[0].text, "Loot: " + Item_NameMarked(31, 1));
     Test_Eq("hunt7feel text: the Korean auto-resolve victory line is Korean", Enemy_AutoResolveBuildMessage({ name: "슬라임" }, { }), "슬라임을(를) 가볍게 쓰러뜨렸습니다.");
     Loc_SetLanguage("en");
     Test_Eq("hunt7feel text: the English auto-resolve victory line is unchanged", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { }), "You overpower Slime.");
@@ -16205,6 +16205,7 @@ function Test_Suite_Rarity() {
     Test_RunSuite("Rarity.shop", Test_RarityShop);
     Test_RunSuite("Rarity.rows", Test_RarityRows);
     Test_RunSuite("Rarity.gem", Test_RarityGem);
+    Test_RunSuite("Rarity.workbook", Test_RarityWorkbook);
     Loc_SetLanguage(_lang);
 }
 
@@ -16273,7 +16274,7 @@ function Test_RarityMarkup() {
     Test_True("r3rarity markup: [r4] is not a tag we know", array_length(Markup_Problems("[r4]a[/r4]")) > 0);
     Test_True("r3rarity markup: an item tag does not nest a term", array_length(Markup_Problems("[r2]a [t]b[/t][/r2]")) > 0);
     Test_True("r3rarity markup: a text with an item tag goes through the rich drawer", Prompt_HasTokens(Item_NameMarked(2)));
-    Test_Eq("r3rarity markup: reveal keeps the span closed", Markup_Reveal("x [r3]Platinum[/r3]", 5), "x [r3]Plat[/r3]");
+    Test_Eq("r3rarity markup: reveal keeps the span closed", Markup_Reveal("x [r3]Platinum[/r3]", 5), "x [r3]Pla[/r3]");
     Test_Eq("r3rarity markup: a marked name fitted plain is the bare name", Ui_FitText(Item_NameMarked(2), 1000), _n2);
 }
 
@@ -16307,7 +16308,7 @@ function Test_RarityPaths() {
     Test_Eq("r3rarity paths: and a common one", Loot_ReceivedLines(10, 3)[0], "Received " + _n10 + " x3.");
     Test_Eq("r3rarity paths: the received line no longer uses the one gold accent", string_pos("[a]", Loot_ReceivedLines(10, 3)[0]), 0);
     Loc_SetLanguage("ko");
-    Test_True("r3rarity paths: the Korean line marks the name too", string_pos(_n2, Loot_ReceivedLines(2, 1)[0]) > 0);
+    Test_True("r3rarity paths: the Korean line marks the name too", string_pos("[r2]" + string(ItemDB_Get(2).name) + "[/r2]", Loot_ReceivedLines(2, 1)[0]) > 0 && string_pos("[a]", Loot_ReceivedLines(2, 1)[0]) == 0);
     Loc_SetLanguage("en");
     // battle drop and auto-resolve drop (one builder)
     var _en = Loot_BuildMessageEntries([{ item_id: 3, qty: 1 }, { item_id: 10, qty: 2 }], "Loot: ");
@@ -16436,4 +16437,25 @@ function Test_RarityGem() {
     Test_Eq("r3rarity gem: an epic gem is also 3 tall", array_length(Rarity_GemRows(3, 1)), 3);
     Test_True("r3rarity gem: the frame flips every 300 ms", Rarity_GemFrame(0) == 0 && Rarity_GemFrame(299) == 0 && Rarity_GemFrame(300) == 1 && Rarity_GemFrame(600) == 0);
     Test_Eq("r3rarity gem: the gold of the gem", Rarity_GemColor("g"), UI_C_MERCHANT_GOLD);
+}
+
+// No workbook string writes an item tag (the game marks every item name it fills in) and none uses the gold accent round an item.
+function Test_RarityWorkbook() {
+    Loc_Init();
+    var _keys = variable_struct_get_names(Loc_GetData().strings);
+    var _bad = "";
+    var _acc = "";
+    for (var _k = 0; _k < array_length(_keys); _k++) {
+        var _e = variable_struct_get(Loc_GetData().strings, _keys[_k]);
+        if (!is_struct(_e)) continue;
+        var _langs = ["en", "ko"];
+        for (var _l = 0; _l < 2; _l++) {
+            var _t = variable_struct_exists(_e, _langs[_l]) ? string(variable_struct_get(_e, _langs[_l])) : "";
+            if (string_pos("[r1]", _t) > 0 || string_pos("[r2]", _t) > 0 || string_pos("[r3]", _t) > 0) _bad += _keys[_k] + "/" + _langs[_l] + " ";
+            if (string_pos("[a]{item}[/a]", _t) > 0 || string_pos("[a]{name}[/a]", _t) > 0) _acc += _keys[_k] + "/" + _langs[_l] + " ";
+        }
+    }
+    Test_True("r3rarity workbook: the workbook has strings to check", array_length(_keys) > 500);
+    Test_Eq("r3rarity workbook: no string writes an item tag", _bad, "");
+    Test_Eq("r3rarity workbook: no string puts the gold accent round an item", _acc, "");
 }
