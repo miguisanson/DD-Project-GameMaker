@@ -172,6 +172,7 @@ function Test_RunAll() {
     Test_RunSuite("R4NoDebug", Test_Suite_R4NoDebug);
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
     Test_RunSuite("R4Final1", Test_Suite_R4Final1);
+    Test_RunSuite("R4Final2", Test_Suite_R4Final2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -19211,4 +19212,86 @@ function Test_R4Final1Chips() {
     var _on = Battle_ChipBlink(true, false, 0);
     var _off = Battle_ChipBlink(true, false, 250);
     Test_True("r4final1 chips: the outline still blinks with the label (on at 0 ms, off at 250 ms)", _on.outline && !_off.outline);
+}
+
+// ============================================================================================================================================================
+// R4 final2 (owner round-4 notes 4, 5): I-109 level-up gold only on the new number + one cursor, I-110 a bush breaks a chase, I-111 monsters stand on the HUD's top line,
+// I-112 Save and Save & Quit in the system menu.
+// ============================================================================================================================================================
+function Test_Suite_R4Final2() {
+    Test_RunSuite("R4Final2.levelup", Test_R4Final2LevelUp);
+}
+
+// I-109 (D177 amended): the stat label and the current number are white; only the NEW number (after ">") is gold. A class growth row shows it always, the hovered row shows its "+1"
+// new number gold too. Mouse hover moves the highlight, the "+1" and the details together: one cursor.
+function Test_R4Final2LevelUp() {
+    var _lang0 = Loc_GetLanguage();
+    Loc_SetLanguage("en");
+    var _k = Test_LvRunBegin();
+    var _gs = GameState_Get();
+    // the row draw spec: old part white, new part gold
+    var _sp = Ui_RowValueSpec({ label: "ATK", value: "12 > 13", new_col: UI_C_MERCHANT_GOLD }, false);
+    Test_Eq("r4final2 levelup: a growth row's old part is '12 > '", _sp.old, "12 > ");
+    Test_Eq("r4final2 levelup: its new number is '13'", _sp.new, "13");
+    Test_Eq("r4final2 levelup: the old part is white", _sp.old_col, UI_C_TEXT);
+    Test_Eq("r4final2 levelup: the new number is gold", _sp.new_col, UI_C_MERCHANT_GOLD);
+    var _sp2 = Ui_RowValueSpec({ label: "SPD", value: "10", new_col: UI_C_MERCHANT_GOLD }, false);
+    Test_Eq("r4final2 levelup: a row with no '>' is only the white number", _sp2.old + "|" + _sp2.new + "|" + string(_sp2.old_col), "10||" + string(UI_C_TEXT));
+    var _sp3 = Ui_RowValueSpec({ label: "Music", value: "50%" }, false);
+    Test_Eq("r4final2 levelup: an ordinary row (no new_col) is one colour", _sp3.old + "|" + _sp3.new + "|" + string(_sp3.old_col == _sp3.new_col), "50%||1");
+    // a Knight: ATK, DEF, VIG, MND grow
+    var _kn = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), Exp_NextLevel(1));
+    _gs.player_ch = _kn;
+    var _m = CardsUi_StatMenu();
+    var _labels_white = true;
+    var _col_bad = "";
+    for (var _i = 0; _i < 6; _i++) {
+        if (Ui_RowStyle(_m.items[_i], false).text != UI_C_TEXT || Ui_RowStyle(_m.items[_i], true).text != UI_C_TEXT || Ui_RowLabelColor(_m.items[_i], false) != UI_C_TEXT) { _labels_white = false; _col_bad += _m.items[_i].label + " "; }
+        if (variable_struct_exists(_m.items[_i], "col")) { _labels_white = false; _col_bad += _m.items[_i].label + "(col) "; }
+    }
+    Test_True("r4final2 levelup: every row's label and current number are white (" + _col_bad + ")", _labels_white);
+    // growth rows (not hovered): ATK, VIG, MND show old white, new gold; DEF is the cursor row: also gold
+    var _gold_new = "";
+    var _plain = "";
+    for (var _j = 0; _j < 6; _j++) {
+        var _s = Ui_RowValueSpec(_m.items[_j], _j == _m.cursor);
+        if (_s.new != "" && _s.new_col == UI_C_MERCHANT_GOLD && _s.old_col == UI_C_TEXT) _gold_new += _m.items[_j].label + ",";
+        else if (_s.new == "" && _s.old_col == UI_C_TEXT) _plain += _m.items[_j].label + ",";
+    }
+    Test_Eq("r4final2 levelup: the Knight's rows with a gold NEW number (growth rows and the hovered DEF)", _gold_new, "ATK,DEF,VIG,MND,");
+    Test_Eq("r4final2 levelup: the other rows (SPD, MAG) are a plain white number", _plain, "SPD,MAG,");
+    // hover a non-growth row: its new number is gold, the rest white
+    _m.cursor = STAT_SPD;
+    CardsUi_StatRefresh(_m);
+    var _spd = Ui_RowValueSpec(_m.items[2], true);
+    Test_Eq("r4final2 levelup: hovered SPD reads '10 > 11' with the 11 gold and '10 > ' white", _spd.old + _spd.new + "|" + string(_spd.old_col == UI_C_TEXT) + string(_spd.new_col == UI_C_MERCHANT_GOLD), "10 > 11|11");
+    var _def = Ui_RowValueSpec(_m.items[1], false);
+    Test_Eq("r4final2 levelup: DEF, no longer hovered, is '12 > 13' with only 13 gold", _def.old + _def.new + "|" + string(_def.old_col == UI_C_TEXT) + string(_def.new_col == UI_C_MERCHANT_GOLD), "12 > 13|11");
+    // one cursor: the mouse over a row moves the highlight (band target), the +1 and the details (the row the details read) together
+    var _mh = CardsUi_StatMenu();
+    var _rects = [];
+    for (var _ri = 0; _ri < 6; _ri++) array_push(_rects, { x: 0, y: _ri * 10, w: 100, h: 10 });
+    _mh.rects = _rects;
+    var _ms = Ui_SnapNew();
+    _ms.mx = 5;
+    _ms.my = 15;   // DEF's row
+    _ms.mouse_moved = true;
+    Ui_MenuStep(_mh, _ms, 5000);
+    CardsUi_StatRefresh(_mh);
+    _ms.my = 25;   // SPD's row
+    Ui_MenuStep(_mh, _ms, 5000);
+    CardsUi_StatRefresh(_mh);
+    Test_Eq("r4final2 levelup: the pointer over SPD puts the cursor on SPD", _mh.cursor, STAT_SPD);
+    Test_Eq("r4final2 levelup: so SPD (and only SPD) shows the +1", Test_LvRowValues(_mh), "11 > 12|12 > 13|10 > 11|3|10 > 12|11 > 12");
+    Test_Eq("r4final2 levelup: and the details panel reads SPD's row (its help line)", _mh.items[_mh.cursor].help, CardsUi_StatHelp(STAT_SPD));
+    Test_Eq("r4final2 levelup: and SPD's Now / After lines", Test_RowValue(_mh.items[_mh.cursor].lines, "Now") + ">" + Test_RowValue(_mh.items[_mh.cursor].lines, "After"), "10>11");
+    // the highlight bar jumps with the cursor on this screen (no glide that can lag behind the +1 and the details)
+    Test_True("r4final2 levelup: the level-up screen's highlight bar is not a glide (it is on the cursor row in the same frame)", _mh.layout.snap_band);
+    _mh.cur_y = 40;
+    Test_Eq("r4final2 levelup: a snapping menu's bar is at the target at once", Ui_MenuBandY(_mh, 100, 16), 100);
+    var _plainm = Ui_MenuNew("r4f2_plain", [{ label: "a", value: "" }, { label: "b", value: "" }], {});
+    _plainm.cur_y = 40;
+    Test_True("r4final2 levelup: any other menu still glides (between its old place and the target)", Ui_MenuBandY(_plainm, 100, 16) > 40 && Ui_MenuBandY(_plainm, 100, 16) < 100);
+    Loc_SetLanguage(_lang0);
+    Test_LvRunEnd(_k);
 }
