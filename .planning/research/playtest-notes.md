@@ -52,3 +52,5 @@
 
 ## Owner playtest round 4 (build 8d176ba-20261017, 2026-10-17)
 1. (screenshot: typing a profile name, the DEBUG OVERLAY opened) "shift + P still does this, please delete this debug overlay"
+2. (screenshot: battle Skill list shows only "Double Shot" under a big details panel) "choosing between skills i cant tell if there are multiple skills i have or i can cycle through them can you make it a bit more obvious during the skill screen in battle"
+3. (screenshot: Dire Wolf chip label "THIRST 3" in green) "I also liked the buffs text before just make it plain white. not green"

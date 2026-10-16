@@ -152,6 +152,9 @@ Found by audits and reviews (no person's words):
 
 | I-106 | owner playtest round 4 note 1 (8d176ba-20261017): Shift+P while typing a profile name opens the DEBUG OVERLAY; "please delete this debug overlay" | BUG | P1 | 8d176ba-20261017 | type a name with P in the name entry | no debug overlay or debug hotkey in the player's game at all (release, D188); keys typed into the name never trigger anything else | fixed on next (fix-r4nodebug, R-120); in the release build |
 
+| I-107 | owner playtest round 4 note 2 (8d176ba): battle Skill list shows one row under the details panel; cannot tell there are more skills or that the list scrolls | UI | P1 | 8d176ba-20261017 | Archer L1 battle, open Skill | the list shows how many skills there are and that it scrolls (at least 2 rows visible where possible, arrows / 'n/m'); the 'Space Choose' hint is not cut at the right edge | open: final fixes |
+| I-108 | owner playtest round 4 note 3 (8d176ba): status chip labels (e.g. THIRST 3) are green; wants plain white like before | UI | P2 | 8d176ba-20261017 | Dire Wolf battle | chip label text white (UI text colour), the last-turn blink still readable | open: final fixes |
+
 ---
 
-*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-107.*
+*Created: 2026-10-13. Updated 2026-10-14. Next free id: I-109.*
