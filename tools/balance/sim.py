@@ -731,7 +731,7 @@ class Battle:
         e = self.e
         if e.hp <= 0:
             return
-        gain = ref.stagger_gain(power, stun, perfect) * max(1, hits)
+        gain = ref.stagger_gain(power, stun, perfect)   # D191: a multi-hit skill fills like ONE hit
         if e.broken or e.smax <= 0:
             return
         e.stagger = min(e.smax, e.stagger + gain)

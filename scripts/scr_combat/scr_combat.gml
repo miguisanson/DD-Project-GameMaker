@@ -551,7 +551,7 @@ function Player_OnDeath(_p) {
 #macro TL_ENEMY 1
 #macro BREAK_DAMAGE_MULT 1.5       // a BROKEN enemy takes +50% damage until its next turn
 #macro STAGGER_PERFECT_MULT 1.5
-#macro STAGGER_STUN_MULT 2
+#macro STAGGER_STUN_MULT 1.5      // D191: was 2
 
 function Turn_Fighter(_id, _spd, _boss = false) {
     return { id: _id, spd: max(1, round(_spd)), gauge: 0, steadfast: 0, boss: _boss };
@@ -638,7 +638,7 @@ function Stagger_Gain(_power, _stun_skill, _perfect) {
 }
 
 function Stagger_Max(_rank, _boss) {
-    return (4 + 4 * max(1, _rank)) * (_boss ? 2 : 1);
+    return round(1.5 * (4 + 4 * max(1, _rank)) * (_boss ? 2 : 1));   // D191: 50% bigger (it was (4 + 4 x rank) x 2 for a boss): 12 / 18, Palehorn 48, the final boss 60
 }
 
 // Adds to the enemy's meter. Returns true when this fills it: BREAK (meter back to 0, broken until its next turn). Nothing fills while broken.
@@ -728,7 +728,7 @@ function Battle_BreakSfxKey(_perfect) {
 function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     var e = _bc.e;
     if (!is_struct(e) || e.hp <= 0) return "";
-    var gain = Stagger_Gain(_power, _stun_skill, _perfect) * max(1, _hits);
+    var gain = Stagger_Gain(_power, _stun_skill, _perfect);   // D191: a multi-hit skill fills like ONE hit (_hits is kept for the callers, no longer a factor)
     _bc.stagger_flash_start = current_time;
     Tutorial_Trigger("stagger");   // D45: the first time the meter fills
     if (!Stagger_Add(e, gain)) return "";
