@@ -243,7 +243,6 @@ function SFX_CategoryForKey(_key) {
     if (string_copy(key, 1, 3) == "ui_") return "ui";
     if (string_copy(key, 1, 9) == "dialogue_") return "ui";
     if (key == "save_confirm" || key == "load_confirm" || key == "delete_confirm") return "ui";
-    if (key == "barrel_break" || key == "chest_open" || key == "kill_torch") return "ui";
 
     return "sfx";
 }
@@ -315,6 +314,9 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("barrel_break", ["barrel_break"]);
     SFX_RegisterResolved("chest_open", ["chest_open"]);
     SFX_RegisterResolved("kill_torch", ["kill_torch"]);
+    // bug hunt 7: the "!" over an enemy that saw the player and the "?" over one that gave up are world sounds (SFX bus, not UI), on the sample they always used
+    SFX_RegisterResolved("alert_spotted", [Modern5, "Modern5", "alert_spotted"]);
+    SFX_RegisterResolved("alert_lost", [Modern5, "Modern5", "alert_lost"]);
     SFX_RegisterResolved("body_falling_wood", ["Body_falling_wood"]);
     SFX_RegisterResolved("metal_resonance", ["Metal_resonance"]);
 
@@ -463,6 +465,8 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("barrel_break", 1.00);
     SFX_RegisterGain("chest_open", 1.00);
     SFX_RegisterGain("kill_torch", 1.00);
+    SFX_RegisterGain("alert_spotted", 1.00);
+    SFX_RegisterGain("alert_lost", 1.00);
     SFX_RegisterGain("body_falling_wood", 1.00);
     SFX_RegisterGain("metal_resonance", 1.00);
 

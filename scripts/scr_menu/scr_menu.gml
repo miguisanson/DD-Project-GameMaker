@@ -4112,7 +4112,7 @@ function Ui_MenuNew(_id, _items, _opts) {
     var m = {
         id: _id, items: _items, cursor: 0, top: 0, rects: [],
         rep_v: Ui_RepeatNew(), rep_h: Ui_RepeatNew(),
-        on_confirm: undefined, on_back: undefined, on_adjust: undefined,
+        on_confirm: undefined, on_back: undefined, on_adjust: undefined, refuse: undefined,
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
@@ -4217,7 +4217,9 @@ function Ui_StackBack(_stk) {
 }
 
 // The sound a Confirm on row _i of menu _m makes: the bright "confirm" ding, or the refusal when the row cannot be used.
+// A menu opts in with a "refuse" callback (_m, _i) -> bool.
 function Ui_ConfirmSound(_m, _i) {
+    if (variable_struct_exists(_m, "refuse") && is_callable(_m.refuse) && _m.refuse(_m, _i)) return "ui_deny";
     return "ui_confirm";
 }
 
@@ -4238,7 +4240,7 @@ function Ui_MenuUpdate(_m, _stk = undefined) {
     }
     if (ev.confirm && is_struct(it) && variable_struct_exists(it, "kind") && it.kind == "slider") ev.confirm = false;   // a slider moves with left/right only
     if (ev.confirm) {
-        SFX_PlayUI("ui_confirm");
+        SFX_PlayUI(Ui_ConfirmSound(_m, ev.index));
         if (is_callable(_m.on_confirm)) _m.on_confirm(_m, ev.index);
     } else if (ev.back) {
         if (is_struct(_stk)) {

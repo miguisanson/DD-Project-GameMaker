@@ -717,8 +717,10 @@ function Battle_StunResolve(_bc) {
 }
 
 // The sound layered on the grade sound when a hit BREAKs. (_perfect: the grade sound already is the Perfect sample.)
+// The strongest grade sound (qte_perfect) is the layer, unless the grade sound already is that sample: then the layer is the heavy hit under it, so two different
+// samples start together and never the same one twice (that was +6 dB on the commonest BREAK, and no distinct cue).
 function Battle_BreakSfxKey(_perfect) {
-    return Qte_GradeSfxKey(QTE_PERFECT);
+    return _perfect ? Qte_GradeSfxKey(QTE_GOOD) : Qte_GradeSfxKey(QTE_PERFECT);
 }
 
 // A landed player hit fills the enemy's stagger meter; a full meter is a BREAK (D75, D92). Returns the text to add to the battle message.
@@ -735,7 +737,7 @@ function Battle_StaggerHit(_bc, _power, _stun_skill, _perfect, _hits = 1) {
     _bc.tl_slide_kind = 1;
     _bc.break_start = current_time;
     var last_key = global.sfx_last_key;   // the BREAK sound is a second layer on top of the grade sound: the grade stays the "last key" the bot checks
-    SFX_Play(Battle_BreakSfxKey(_perfect));
+    SFX_Play(Battle_BreakSfxKey(_perfect), _perfect ? 0.8 : 1, _perfect ? 0.8 : 1);
     global.sfx_last_key = last_key;
     CameraShake_Start(QTE_SHAKE_PERFECT_MAG, QTE_SHAKE_PERFECT_MS, SHAKE_DIR_H);
     if (_bc.hitstop_ms > 0) {   // D138 / D139: the hit's freeze is still to come: a BREAK freezes 120 ms and punches the zoom in (Battle_HitFeel)
@@ -922,7 +924,10 @@ function Qte_AssistTimeMultNow() {
 }
 
 // Milliseconds one frame adds to the QTE clock, from delta_time (microseconds). Capped so a hitch cannot skip the bar (QTE-01, QTE-14).
+// D122 (bug hunt 7): while the window is not in front (global.focus_prev, kept by Focus_Step) it adds nothing, so a bar, the arrows, the defence bar with its
+// telegraph, the grade word and the hit freeze all stop and carry on exactly where they were.
 function Qte_StepMs(_delta_us) {
+    if (variable_global_exists("focus_prev") && !global.focus_prev) return 0;
     return clamp(_delta_us, 0, QTE_MAX_STEP_US) / 1000;
 }
 
@@ -2991,6 +2996,18 @@ function Battle_CmdConfirm(_m, _i) {
     }
 }
 
+// D133: a row that cannot be used answers with the refusal sound: a skill the player cannot pay for (the row is dimmed), Skill or Item with nothing in the list.
+function Battle_MenuRefuse(_m, _i) {
+    if (_i < 0 || _i >= array_length(_m.items)) return false;
+    var it = _m.items[_i];
+    if (variable_struct_exists(it, "dim") && it.dim) return true;
+    if (variable_struct_exists(it, "id")) {
+        if (it.id == "skill") return array_length(Battle_GetSkillList(_m.owner)) <= 0;
+        if (it.id == "item") return array_length(Battle_GetItemList(_m.owner)) <= 0;
+    }
+    return false;
+}
+
 function Battle_SkillConfirm(_m, _i) {
     Battle_SkillQteBegin(_m.owner, _m.items[_i].skill_id);
 }
@@ -3009,11 +3026,11 @@ function Battle_ListBack(_m, _res) {
 function Battle_MenusBuild(_bc) {
     var z = Battle_Zones();
     _bc.ui_cmd = Ui_MenuNew("battle_cmd", Battle_CmdItems(_bc), {
-        owner: _bc, on_confirm: Battle_CmdConfirm,
+        owner: _bc, on_confirm: Battle_CmdConfirm, refuse: Battle_MenuRefuse,
         layout: { x_anchor: "right", panel_w: round(z.right.w * 0.5), y_bottom: z.list_bottom }
     });
     _bc.ui_skill = Ui_MenuNew("battle_skill", Battle_SkillRows(_bc.p, _bc.e), {
-        owner: _bc, on_confirm: Battle_SkillConfirm, on_back: Battle_ListBack,
+        owner: _bc, on_confirm: Battle_SkillConfirm, refuse: Battle_MenuRefuse, on_back: Battle_ListBack,
         layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
     });
     _bc.ui_item = Ui_MenuNew("battle_item", Battle_ItemRows(_bc.p), {

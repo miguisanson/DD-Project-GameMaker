@@ -41,7 +41,8 @@ function Enemy_CanAutoResolve(_cfg, _player_level, _enemy_level) {
     return (_player_level >= _enemy_level + ENEMY_AUTO_RESOLVE_LEVEL_DELTA);
 }
 
-function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = "You overpower ") {
+function Enemy_AutoResolveBuildMessage(_cfg, _result, _verb_prefix = undefined) {
+    if (is_undefined(_verb_prefix)) _verb_prefix = Loc_T("combat.msg.overpower_prefix", "You overpower {enemy}.");   // D9: Korean has its own wording
     var enemy_name = "";
     if (is_struct(_cfg) && variable_struct_exists(_cfg, "name")) enemy_name = string(_cfg.name);
     if (enemy_name == "") enemy_name = Loc_T("enemy.name.unknown", "Enemy");
@@ -167,7 +168,7 @@ function Enemy_AutoResolveFinalize(_enemy_id, _enemy_level, _loot_key, _enemy_na
 
     if (variable_struct_exists(cfg, "name")) _enemy_name = cfg.name;
     var summary = Enemy_AutoResolveBuildMessage({ name: _enemy_name }, result);
-    var loot_entries = Loot_BuildMessageEntries(loot, "Loot: ");
+    var loot_entries = Loot_BuildMessageEntries(loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
     return {
         message: summary,
         loot_entries: loot_entries
@@ -682,7 +683,7 @@ function EnemyAI_Update(_inst, _cfg, _pl) {
         _inst.patrol_cx = -1;
         _inst.stuck_frames = 0;
         Nav_Stats().spots++;
-        SFX_Play("ui_confirm", 0.5, 1.5);   // existing sound, small and high: "!"
+        SFX_Play("alert_spotted", 0.5, 1.5);   // existing sound, small and high: "!" (a world sound: SFX bus)
     } else if (_heard) {
         // D153: it heard the player run: turn and go to where the noise came from, no "!" (it has not seen anyone); once there it searches like after a lost sight
         _inst.ai_mode = "chase";
@@ -1660,7 +1661,7 @@ function Player_ApplyHiddenLook(_pl) {
 function EnemyAI_PopQuestion(_inst) {
     _inst.question_pop = AI_QUESTION_FRAMES;
     _inst.q_pops++;
-    SFX_Play("ui_confirm", 0.35, 0.9);   // the "!" sound a little lower and softer: "hm?"
+    SFX_Play("alert_lost", 0.35, 0.9);   // the "!" sound a little lower and softer: "hm?" (SFX bus)
 }
 
 // D158: on a room arrival (the player is placed) every enemy that stands near an exit or near the arrival tile is put back (home, or a clear spot) and forgets its chase.
