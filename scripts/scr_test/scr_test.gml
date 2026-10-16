@@ -13926,12 +13926,7 @@ function TextFit_Sizes() {
 // entry (the assertion's name ends with `where`, the failure text holds `has`) is not reported; every entry must still match something, so the day the text is
 // shortened the entry is deleted from here. Nothing else may fail.
 function TextFit_Known() {
-    return [
-        { where: "tab skills 800x720 en", has: "'Horizontal Slash'" },
-        { where: "battle lists 640x576 en", has: "'Horizontal Slash'" },
-        { where: "battle lists 800x720 en", has: "'Horizontal Slash'" },
-        { where: "battle lists 800x720 en", has: "'Poison Arrow'" }
-    ];
+    return [];   // R-106: nothing is left for the text side; every skill, passive and card name is shown in full (wrapped, or in a wider column)
 }
 
 // _fn(_w, _h, _lang) -> an array of failure texts; one assertion per picture size and language, named _name.
@@ -14031,6 +14026,32 @@ function TextFit_Char() {
     return _ch;
 }
 
+// R-106: the same character with an upgrade on every skill (every skill name then ends in "+"), and the rows of the lists that show its skills. The skill rows read
+// the upgrades through the current player (Card_PlayerRef), so it is the current player while they are built.
+function TextFit_UpgradedRows(_what) {
+    var _c = TextFit_Char();
+    _c.upgrades = [];
+    for (var _i = 0; _i < array_length(_c.skills); _i++) array_push(_c.upgrades, _c.skills[_i]);
+    var _gs = GameState_Get();
+    var _old = _gs.player_ch;
+    _gs.player_ch = _c;
+    var _rows = (_what == "tab") ? TabSkills_Items(_c) : Battle_SkillRows(_c, undefined);
+    _gs.player_ch = _old;
+    return _rows;
+}
+
+// A centred list menu (the replace, echo and bed lists) at the width it measures itself to: every label must fit its row.
+function TextFit_CentreMenu(_fails, _what, _items, _title) {
+    var _mt = Ui_Metrics();
+    var _m = Ui_MenuNew("fit_" + _what, _items, { layout: { title: _title, anchor: "center", details: true } });
+    var _mc = Ui_MenuMeasure(_m, _mt);
+    for (var _i = 0; _i < array_length(_items); _i++) {
+        var _val = variable_struct_exists(_items[_i], "value") ? _items[_i].value : "";
+        TextFit_Line(_fails, _what + " row", _items[_i].label, Ui_MenuLabelRoom(_mc.panel_w, _mt.p, _mc.icon_px, false, _val));
+    }
+    TextFit_Line(_fails, _what + " title", _title, _mc.panel_w - 8 * _mt.p);
+}
+
 // A profile that has met every enemy (elite too), read every note, finished a run of each result.
 function TextFit_Profile() {
     var _prof = Profile_Default();
@@ -14059,7 +14080,8 @@ function TextFit_Longest(_names) {
 function Test_Suite_TextFit() {
     global.textfit_known_hits = array_create(array_length(TextFit_Known()), 0);
     // ---- the Tab pages: every row's label in its list, every number line and sentence in its details panel ----
-    TextFit_Each("tab skills", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "skills", TabSkills_Items(_c), TabMenu_Title("skills", _c)); return _f; });
+    TextFit_Each("tab skills", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "skills", TextFit_UpgradedRows("tab"), TabMenu_Title("skills", _c)); return _f; });
+    TextFit_Each("tab skills plain names", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "skills", TabSkills_Items(_c), TabMenu_Title("skills", _c)); return _f; });
     TextFit_Each("tab items", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "items", TabItems_Items(_c), TabMenu_Title("items", _c)); return _f; });
     TextFit_Each("tab gear", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "gear", TabGear_Items(_c), TabMenu_Title("gear", _c)); return _f; });
     TextFit_Each("tab status", function(_w, _h, _l) { var _f = []; var _c = TextFit_Char(); TextFit_TabPage(_f, "status", TabStatus_Items(_c), TabMenu_Title("status", _c)); return _f; });
@@ -14071,6 +14093,38 @@ function Test_Suite_TextFit() {
     TextFit_Each("tab system", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", TabSystem_Items(false), Loc_T("tab.title.system", "System")); return _f; });
     TextFit_Each("help list", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", TabHelp_Items(), Loc_T("help.title", "Help")); return _f; });
     TextFit_Each("help stats", function(_w, _h, _l) { var _f = []; TextFit_TabPage(_f, "system", Help_StatsItems(), Loc_T("help.stats.title", "Stats & terms")); return _f; });
+
+    // R-106: the Settings > Controls page (the first label was cut to "Confi.." at 640 x 576): every action's label with its keys, and with "Press a key..." in its place
+    TextFit_Each("controls page", function(_w, _h, _l) {
+        var _f = [];
+        var _title = Loc_T("controls.title", "Controls");
+        TextFit_TabPage(_f, "settings", Controls_Items(Binds_Defaults(), ""), _title);
+        var _ids = Binds_RowIds();
+        for (var _i = 0; _i < array_length(_ids); _i++) TextFit_TabPage(_f, "settings", Controls_Items(Binds_Defaults(), _ids[_i], _ids[_i], Controls_WaitingText(Binds_RowLabel(_ids[_i]), "keyboard")), _title);
+        return _f;
+    });
+
+    // R-106: the lists that show skill names beside the Skills tab and the battle: the replace list, the echo list (with its "Skill: " prefix) and the bed's upgrade list, upgraded names too
+    TextFit_Each("skill name lists", function(_w, _h, _l) {
+        var _f = [];
+        var _c = TextFit_Char();
+        var _rep = [];
+        var _echo = [];
+        var _bed = [];
+        var _names = [];
+        for (var _i = 0; _i < array_length(_c.skills); _i++) {
+            var _id = _c.skills[_i];
+            var _up = SkillDB_GetBase(_id).name + "+";
+            array_push(_names, _up);
+            array_push(_rep, { label: _up, value: Loc_T("card.mp_short", "{mp} MP", { mp: "99" }), help: "", lines: [] });
+            array_push(_echo, { label: Run_EchoLabel({ kind: "skill", id: _id }), help: "", lines: [] });
+            array_push(_bed, { label: SkillDB_GetBase(_id).name, value: "+", help: "", lines: [] });
+        }
+        TextFit_CentreMenu(_f, "replace", _rep, Loc_T("cards.replace.title", "Learn {skill}: Replace Which?", { skill: TextFit_Longest(_names) }));
+        TextFit_CentreMenu(_f, "echo", _echo, Loc_T("echo.pick.title", "Keep One Skill You Remember"));
+        TextFit_CentreMenu(_f, "bed", _bed, Loc_T("bed.upgrade_title", "Upgrade Which Skill?"));
+        return _f;
+    });
 
     // ---- the battle: the command rows, the skill and item rows with their icons and MP / count, the number lines of the details panel ----
     TextFit_Each("battle commands", function(_w, _h, _l) {
@@ -14089,7 +14143,7 @@ function Test_Suite_TextFit() {
         var _p = _mt.p;
         var _z = Battle_Zones();
         var _c = TextFit_Char();
-        var _sets = [Battle_SkillRows(_c, undefined), Battle_ItemRows(_c)];
+        var _sets = [TextFit_UpgradedRows("battle"), Battle_ItemRows(_c)];
         var _icon_px = 16 * max(1, floor(_mt.row_h / 16));
         var _col_w = (_z.right.w - 8 * _p - 3 * _p) / 2;
         for (var _s = 0; _s < 2; _s++) {
