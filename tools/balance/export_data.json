@@ -1,5 +1,5 @@
 {
- "build": "93e11be-20261017-dirty",
+ "build": "d9e8ae8-20261017-dirty",
  "cards": [
   {
    "classes": [
@@ -1674,7 +1674,7 @@
    "stagger_stun_mult": 1.5,
    "steadfast_turns": 2.0
   },
-  "unarmed_power": 5.0,
+  "unarmed_power": 2.0,
   "weapon_skill_share": 0.5
  },
  "enemies": [
