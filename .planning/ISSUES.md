@@ -150,7 +150,7 @@ Found by audits and reviews (no person's words):
 | I-104 | owner playtest round 3 note 28 (7f4d08e-20261016): Spellweave card name/tag/text spill out of the frame | BUG | P2 | 7f4d08e-20261016 | playtest-notes.md round 3 #28 | see status | open: packet cards (R-095) |
 | I-105 | owner playtest round 3 note 29 (7f4d08e-20261016): huge enemy sight; enemies find you at your last spot; cannot escape a slime | DESIGN | P1 | 7f4d08e-20261016 | playtest-notes.md round 3 #29 | see status | open: D179 |
 
-| I-106 | owner playtest round 4 note 1 (8d176ba-20261017): Shift+P while typing a profile name opens the DEBUG OVERLAY; "please delete this debug overlay" | BUG | P1 | 8d176ba-20261017 | type a name with P in the name entry | no debug overlay or debug hotkey in the player's game at all (release, D188); keys typed into the name never trigger anything else | open: final fixes |
+| I-106 | owner playtest round 4 note 1 (8d176ba-20261017): Shift+P while typing a profile name opens the DEBUG OVERLAY; "please delete this debug overlay" | BUG | P1 | 8d176ba-20261017 | type a name with P in the name entry | no debug overlay or debug hotkey in the player's game at all (release, D188); keys typed into the name never trigger anything else | fixed on next (fix-r4nodebug, R-120); in the release build |
 
 ---
 
