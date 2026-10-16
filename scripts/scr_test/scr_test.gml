@@ -171,6 +171,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Ideas2", Test_Suite_R3Ideas2);
     Test_RunSuite("R4NoDebug", Test_Suite_R4NoDebug);
     Test_RunSuite("R3Loudness", Test_Suite_R3Loudness);
+    Test_RunSuite("R4Final1", Test_Suite_R4Final1);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14912,7 +14913,7 @@ function Test_R3Layout() {
     TextFit_End(_s);
 }
 
-// 4. The last-turn blink is an outline round the chip's icon cell and a label that toggles lightest / light, never a filled box; it follows the turns left.
+// 4. The last-turn blink is an outline round the chip's icon cell and a label that toggles white / light green (I-108), never a filled box; it follows the turns left.
 function Test_R3Blink() {
     var _on = Battle_ChipBlink(true, true, 0);
     var _off = Battle_ChipBlink(true, true, 250);
@@ -14921,11 +14922,11 @@ function Test_R3Blink() {
     Test_True("r3bvis blink: on the dark beat (250 ms later) the outline is off", !_off.outline);
     Test_True("r3bvis blink: and it is on again 500 ms in", _on2.outline);
     Test_True("r3bvis blink: never a filled box, on either beat", !_on.box && !_off.box && !_on2.box);
-    Test_True("r3bvis blink: the label is lightest on the lit beat and light on the dark beat", _on.label_col == UI_C_LIGHTEST && _off.label_col == UI_C_LIGHT && _on2.label_col == UI_C_LIGHTEST);
+    Test_True("r3bvis blink: the label is white on the lit beat and light green on the dark beat", _on.label_col == UI_C_TEXT && _off.label_col == UI_C_LIGHT && _on2.label_col == UI_C_TEXT);
     var _calm = Battle_ChipBlink(false, true, 0);
     var _calm2 = Battle_ChipBlink(false, false, 0);
     Test_True("r3bvis blink: a chip with turns left does not blink: no outline, no box", !_calm.outline && !_calm.box && !_calm2.outline && !_calm2.box);
-    Test_True("r3bvis blink: its label keeps its own colour (white-green for a debuff, mid green for a buff)", _calm.label_col == UI_C_LIGHTEST && _calm2.label_col == UI_C_LIGHT);
+    Test_True("r3bvis blink: its label is plain white, a debuff or a buff (I-108)", _calm.label_col == UI_C_TEXT && _calm2.label_col == UI_C_TEXT);
 
     // R-094: a bleed blinks on its last TURN, not because its stack count is 1
     var _ch = CharacterCreate_Player(CLASS_KNIGHT);
@@ -16112,17 +16113,17 @@ function Test_R3FixDetLists() {
                     // what the panel kept: the sentence, and the lines in priority order (level 0 all, 1 the kept ones, 2 the last resort)
                     var _full = Test_R3FixDetLabels(_it.lines);
                     var _shown = json_stringify(Test_R3FixDetLabels(_g.lines_shown));
-                    var _want = (_g.lines_level == 0) ? json_stringify(_full) : json_stringify(Test_R3FixDetKeeps(_it.lines, _k == 0, _g.lines_level >= 2));
+                    var _want = (_g.lines_level == 0) ? json_stringify(_full) : ((_g.lines_level >= 3) ? json_stringify([]) : json_stringify(Test_R3FixDetKeeps(_it.lines, _k == 0, _g.lines_level >= 2)));   // I-107: level 3 keeps no number line
                     if (_g.det_rect.w <= 0 || _shown != _want) _f.keep += _tag + "level " + string(_g.lines_level) + " shown=" + _shown + " want=" + _want + "; ";
                     var _normal_rows = min(3, array_length(_m.items));
                     var _reduced = (_g.rows_vis < _normal_rows);
                     var _seq = (variable_struct_exists(_it, "seq") && array_length(_it.seq) > 0);
                     if (_reduced && (_g.lines_level < 1 || (_seq && !_g.seq_drop))) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " level " + string(_g.lines_level) + "; ";
-                    if (_g.gap < _mt.margin && _g.rows_vis != 1) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
-                    if (_g.hint_hidden && (_g.rows_vis != 1 || _g.lines_level < 1)) _f.order += _tag + "hint left out with " + string(_g.rows_vis) + " rows, level " + string(_g.lines_level) + "; ";
-                    if (_g.lines_level >= 2 && !(_g.hint_hidden && _g.rows_vis == 1)) _f.order += _tag + "last-resort lines before the hint and the rows gave way; ";
+                    if (_g.gap < _mt.margin && _g.rows_vis != 1 && !_g.det_tight) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
+                    if (_g.hint_hidden && (_g.rows_vis > 2 || _g.lines_level < 1)) _f.order += _tag + "hint left out with " + string(_g.rows_vis) + " rows, level " + string(_g.lines_level) + "; ";
+                    if (_g.lines_level >= 2 && !(_g.hint_hidden && _g.rows_vis <= 2)) _f.order += _tag + "last-resort lines before the hint and the rows gave way; ";
                     if (_g.lines_level >= 1 && _seq && !_g.seq_drop && _g.rows_vis < _normal_rows) _f.order += _tag + "arrows kept while rows go; ";
-                    if ((_g.det_step > 0 || _g.det_tight) && !(_g.hint_hidden && _g.rows_vis == 1 && _g.lines_level >= 2)) _f.order += _tag + "smaller type before the rest gave way; ";
+                    if ((_g.det_step > 0 || _g.det_tight) && !(_g.hint_hidden && _g.rows_vis <= 2 && _g.lines_level >= 2)) _f.order += _tag + "smaller type before the rest gave way; ";
                     if (_g.hint_hidden) _hid++;
                     if (_g.det_step > 0) _stp++;
                     if (_g.lines_level >= 2) _l2++;
@@ -16141,7 +16142,7 @@ function Test_R3FixDetLists() {
     Test_Eq("r3fixdet lists: the hint stays with the details panel", _f.hint, "");
     Test_Eq("r3fixdet lists: the details panel keeps its sentence and its lines in priority order: Damage / Perfect / MP stay while anything else goes first (only the last resort drops the MP the row also shows)", _f.keep, "");
     Test_Eq("r3fixdet lists: the list shows fewer rows only after the details dropped what they could", _f.rows, "");
-    Test_Eq("r3fixdet lists: the order of giving way is lines, arrows, rows, then the hint, then the last-resort lines, then the smaller type", _f.order, "");
+    Test_Eq("r3fixdet lists: the order of giving way is lines, arrows, rows (down to two), then the hint, then the last-resort lines, then the smaller type (I-107: one row only after all of that)", _f.order, "");
     Test_True("r3fixdet lists: (info) the hint is left out in " + string(_hid) + " of " + string(_n) + " layouts, the last-resort lines in " + string(_l2) + ", the smaller type in " + string(_stp), true);
     TextFit_End(_s);
 }
@@ -19047,4 +19048,167 @@ function Test_Suite_R3Loudness() {
     Test_Eq("loudness: another sound's copies do not count (Punch_2 once: no victim)", SFX_SameSoundOverflow(_four, Punch_2, SFX_MAX_SAME_SOUND), -1);
     var _skip = [{ handle: 31, asset: Punch_2 }, { handle: 32, asset: Punch_1 }, { handle: 33, asset: Punch_1 }, { handle: 34, asset: Punch_1 }];
     Test_Eq("loudness: the victim is the oldest copy of that sound (index 1, not the other sound at 0)", SFX_SameSoundOverflow(_skip, Punch_1, SFX_MAX_SAME_SOUND), 1);
+}
+
+
+// ============================================================================================================================
+// Round 4 final fixes, packet final1. I-107 (R-121): the battle Skill and Item lists always show how many entries there are and that they scroll: at least two rows when the list has
+// two or more entries (the details panel gives way first), an up / down triangle in the frame when rows are hidden above / below, and a "3/7" counter in the frame's corner; the
+// "Choose" hint stays on screen. I-108 (R-122): every status chip label (buff or debuff, the enemy's or the player's) is plain white; the last-turn blink toggles white / light green.
+// ============================================================================================================================
+function Test_Suite_R4Final1() {
+    Test_RunSuite("R4Final1.lists", Test_R4Final1Lists);
+    Test_RunSuite("R4Final1.chips", Test_R4Final1Chips);
+}
+
+// A character of class _cls: _full = every skill of the class and a full inventory; else the level 1 kit.
+function Test_R4Final1Char(_cls, _full) {
+    var _ch = _full ? TextFit_Char() : CharacterCreate_Player(_cls);
+    if (_full) {
+        _ch.skills = Skill_IdsOfClass(_cls);
+        _ch.upgrades = [];
+    }
+    _ch.mp = _ch.max_mp;
+    return _ch;
+}
+
+function Test_R4Final1Rect(_r) {
+    return (_r.w > 0 && _r.h > 0);
+}
+
+function Test_R4Final1Lists() {
+    var _s = TextFit_Begin();
+    var _gs = GameState_Get();
+    var _old = _gs.player_ch;
+    var _langs = ["en", "ko"];
+    var _sizes = TextFit_Sizes();
+    var _classes = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE];
+    var _enemies = [ENEMY_FINAL_BOSS, ENEMY_SLIME];
+    var _f = { rows: "", count: "", up: "", down: "", cue: "", screen: "", enemy: "", hint: "", plan: "" };
+    var _n = 0;
+    var _multi = 0;
+    var _scrolls = 0;
+    var _nolim = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _mt = Ui_Metrics();
+            var _gw = Display_GuiW();
+            var _gh = Display_GuiH();
+            for (var _c = 0; _c < 3; _c++) {
+                for (var _v = 0; _v < 2; _v++) {
+                    for (var _e = 0; _e < 2; _e++) {
+                        var _ch = Test_R4Final1Char(_classes[_c], _v == 1);
+                        _gs.player_ch = _ch;
+                        var _bc = Test_R3Make(_enemies[_e], "", 0, false, false);
+                        _bc.p = _ch;
+                        _bc.run_fails = 0;
+                        _bc.ui_cmd = undefined;
+                        Battle_MenusBuild(_bc);
+                        Battle_MenusLayout(_bc);
+                        var _er = Battle_EnemyRect(_bc);
+                        var _lists = [_bc.ui_skill, _bc.ui_item];
+                        for (var _k = 0; _k < 2; _k++) {
+                            var _m = _lists[_k];
+                            var _state = (_k == 0) ? BSTATE_SKILL_MENU : BSTATE_ITEM_MENU;
+                            var _cnt = array_length(_m.items);
+                            if (_cnt <= 0) continue;
+                            if (_k == 1 && !(_c == 0 && _v == 1 && _e == 0)) continue;   // the item list: once per language and size, the full inventory against the boss
+                            var _top = 0;
+                            var _seq = [];
+                            for (var _a = 0; _a < _cnt; _a++) array_push(_seq, _a);
+                            for (var _b = _cnt - 2; _b >= 0; _b--) array_push(_seq, _b);
+                            for (var _q = 0; _q < array_length(_seq); _q++) {
+                                _m.cursor = _seq[_q];
+                                var _mc = Ui_MenuMeasure(_m, _mt);
+                                var _g = Ui_MenuGeom(_m, _mt, _mc, 1);
+                                var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " " + ((_k == 0) ? "skill" : "item") + " class " + string(_classes[_c]) + " full=" + string(_v) + " enemy " + string(_enemies[_e]) + " cur " + string(_seq[_q]) + "/" + string(_cnt) + "; ";
+                                _n++;
+                                if (_cnt >= 2) _multi++;
+                                if (_cnt >= 2) {
+                                    // two rows are owed unless even the most squeezed details panel (the sentence alone, one type step smaller, tight, no hint, the panels sharing a border) leaves no room for two
+                                    // rows under the enemy: that is a physical limit of a long sentence at a big text size (800 x 720), where one whole row is all that fits
+                                    var _ci = clamp(_m.cursor, 0, _cnt - 1);
+                                    var _sq = Ui_DetailsHeight(_g.panel_w, _m.items[_ci].help, [], 2, 0, undefined, 1, true);
+                                    var _room = _m.layout.y_bottom - _m.layout.det_floor_alt;
+                                    var _can2 = (Ui_AboveNeed(_sq, -2 * _mt.p, _g.chrome_y, 2, _g.rhs, _mt, _ci) <= _room);
+                                    if (_can2 && _g.rows_vis < 2) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " although two fit; ";
+                                    if (!_can2) { _nolim++; if (_sizes[_z][0] < 800) _f.rows += _tag + "two rows do not fit below 800 wide; "; }
+                                }
+                                var _hr = Battle_ListHintRect(_g.det_rect, _state, _g.hint_hidden);
+                                if (_hr.w > 0 && (_hr.x < 0 || _hr.x + _hr.w > _gw || _hr.y < 0)) _f.hint += _tag + json_stringify(_hr) + "; ";
+                                if (!variable_struct_exists(_g, "cue_on") || !_g.cue_on || !variable_struct_exists(_m.layout, "scroll_cue") || !_m.layout.scroll_cue) {
+                                    _f.cue += _tag + "no scroll cue; ";
+                                    continue;
+                                }
+                                _top = Ui_ScrollTopH(_m.cursor, _top, _g.rhs, _g.list_room);
+                                var _end = Ui_RowsEnd(_g.rhs, _top, _g.list_room);
+                                var _cue = Ui_MenuCue(_m, _mt, _g, _top);
+                                if (_top > 0 || _end < _cnt - 1) _scrolls++;
+                                if (_cue.counter != string(_m.cursor + 1) + "/" + string(_cnt)) _f.count += _tag + "counter '" + _cue.counter + "'; ";
+                                if (Test_R4Final1Rect(_cue.up) != (_top > 0)) _f.up += _tag + "top=" + string(_top) + " up=" + json_stringify(_cue.up) + "; ";
+                                if (Test_R4Final1Rect(_cue.down) != (_end < _cnt - 1)) _f.down += _tag + "end=" + string(_end) + " down=" + json_stringify(_cue.down) + "; ";
+                                var _parts = [_cue.counter_rect, _cue.up, _cue.down];
+                                for (var _r = 0; _r < 3; _r++) {
+                                    var _pr = _parts[_r];
+                                    if (!Test_R4Final1Rect(_pr)) continue;
+                                    if (_pr.x < _g.rect.x || _pr.x + _pr.w > _g.rect.x + _g.rect.w) _f.screen += _tag + "cue " + string(_r) + " outside the frame's width " + json_stringify(_pr) + "; ";
+                                    if (_pr.x < 0 || _pr.y < 0 || _pr.x + _pr.w > _gw || _pr.y + _pr.h > _gh) _f.screen += _tag + "cue " + string(_r) + " off screen " + json_stringify(_pr) + "; ";
+                                    if (Test_RectsOverlap(_pr, _er)) _f.enemy += _tag + "cue " + string(_r) + " on the enemy; ";
+                                }
+                                if (!Test_R4Final1Rect(_cue.counter_rect)) _f.plan += _tag + "no counter; ";
+                            }
+                        }
+                        instance_destroy(_bc.enemy_inst);
+                    }
+                }
+            }
+        }
+    }
+    _gs.player_ch = _old;
+    Test_True("r4final1 lists: (setup) many cursor positions were looked at (" + string(_n) + ", " + string(_multi) + " with 2+ entries)", _n >= 300 && _multi >= 300);
+    Test_Eq("r4final1 lists: a list with 2+ entries shows at least 2 rows (480, 640, 800; en, ko; every class, level 1 kit and full kit; boss and slime), except where two rows cannot fit even with the details squeezed (only 800 wide)", _f.rows, "");
+    Test_True("r4final1 lists: (info) " + string(_nolim) + " of " + string(_multi) + " positions have no room for two rows even with the details squeezed (800 x 720, a sentence of 4+ lines)", true);
+    Test_Eq("r4final1 lists: the list has a scroll cue (a counter and arrows)", _f.cue, "");
+    Test_True("r4final1 lists: (setup) some lists really scroll (" + string(_scrolls) + " positions with hidden rows)", _scrolls >= 100);
+    Test_Eq("r4final1 lists: the counter reads current/total", _f.count, "");
+    Test_Eq("r4final1 lists: the up arrow shows exactly when rows are hidden above", _f.up, "");
+    Test_Eq("r4final1 lists: the down arrow shows exactly when rows are hidden below", _f.down, "");
+    Test_Eq("r4final1 lists: the cue stays inside the frame's width and on screen", _f.screen, "");
+    Test_Eq("r4final1 lists: the cue never stands on the enemy", _f.enemy, "");
+    Test_Eq("r4final1 lists: the counter is always there", _f.plan, "");
+    Test_Eq("r4final1 lists: the Choose hint is fully on screen", _f.hint, "");
+    TextFit_End(_s);
+}
+
+// I-108 / R-122: every chip label is plain white (UI_C_TEXT), a buff or a debuff, on the player's chips and on the enemy's; the last turn toggles white / light green with the outline.
+function Test_R4Final1Chips() {
+    Test_True("r4final1 chips: (setup) UI_C_TEXT is white", UI_C_TEXT == $FFFFFF);
+    var _ch = TextFit_Char();   // every status at once, buffs and debuffs
+    var _en = EnemyCreate(ENEMY_DIREWOLF);
+    var _sids = Status_AllIds();
+    for (var _t = 0; _t < array_length(_sids); _t++) _en = Status_Add(_en, _sids[_t], 3, 2);
+    var _who = ["player", "enemy"];
+    var _fighters = [_ch, _en];
+    var _bad = "";
+    var _seen = [0, 0, 0, 0];   // player buffs, player debuffs, enemy buffs, enemy debuffs
+    for (var _w = 0; _w < 2; _w++) {
+        var _chips = Battle_StatusChips(_fighters[_w]);
+        for (var _i = 0; _i < array_length(_chips); _i++) {
+            var _c = _chips[_i];
+            if (!variable_struct_exists(_c, "lab_name") || _c.lab_name == "") continue;
+            _seen[_w * 2 + (_c.negative ? 1 : 0)]++;
+            var _calm0 = Battle_ChipBlink(false, _c.negative, 0).label_col;
+            var _calm1 = Battle_ChipBlink(false, _c.negative, 250).label_col;
+            var _last0 = Battle_ChipBlink(true, _c.negative, 0).label_col;
+            var _last1 = Battle_ChipBlink(true, _c.negative, 250).label_col;
+            if (_calm0 != UI_C_TEXT || _calm1 != UI_C_TEXT) _bad += _who[_w] + " " + _c.lab_name + " (" + (_c.negative ? "debuff" : "buff") + ") calm colour " + string(_calm0) + "; ";
+            if (_last0 != UI_C_TEXT || _last1 != UI_C_LIGHT) _bad += _who[_w] + " " + _c.lab_name + " last-turn blink " + string(_last0) + " / " + string(_last1) + "; ";
+        }
+    }
+    Test_True("r4final1 chips: (setup) a buff and a debuff label were looked at on both sides (" + json_stringify(_seen) + ")", _seen[0] > 0 && _seen[1] > 0 && _seen[2] > 0 && _seen[3] > 0);
+    Test_Eq("r4final1 chips: every label is white, and blinks white / light green on its last turn", _bad, "");
+    var _on = Battle_ChipBlink(true, false, 0);
+    var _off = Battle_ChipBlink(true, false, 250);
+    Test_True("r4final1 chips: the outline still blinks with the label (on at 0 ms, off at 250 ms)", _on.outline && !_off.outline);
 }

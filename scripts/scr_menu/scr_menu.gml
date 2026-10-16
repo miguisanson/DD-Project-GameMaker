@@ -6385,6 +6385,7 @@ function Ui_MenuMeasure(_m, _mt) {
 function Ui_DetailsKeepLines(_lines, _level = 1) {
     var n = array_length(_lines);
     var out = [];
+    if (_level >= 3) return out;   // I-107: the very last resort before the list goes below two rows: no number line at all (the sentence stays)
     var marked = false;
     for (var i = 0; i < n; i++) if (variable_struct_exists(_lines[i], "keep") && _lines[i].keep) marked = true;
     for (var j = 0; j < n; j++) {
@@ -6422,7 +6423,7 @@ function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
     var seq_drop = false;         // G10: the arrow strip is left out of the details when nothing else makes room
     var gap = mt.margin;          // the space between the list and its details panel
     var one_row = false;          // R-106: the list is a window of one row, as tall as the highlighted row
-    var lines_level = 0;          // R-108: 0 = every number line is shown, 1 = the kept lines, 2 = the last resort (Ui_DetailsKeepLines)
+    var lines_level = 0;          // R-108: 0 = every number line is shown, 1 = the kept lines, 2 = the last resort, 3 = none (I-107) (Ui_DetailsKeepLines)
     var det_tight = false;        // R-108: the last resort: the panels share a border (gap -2p) and the details have one pixel unit of air inside the frame, not two
     var det_step = 0;             // R-108: the sentence is set one type step smaller (the last resort)
     var hint_hidden = false;      // R-108: the prompt line over the details panel is left out when nothing else makes room
@@ -6437,12 +6438,16 @@ function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
         var ci = clamp(_m.cursor, 0, n - 1);
         if (Ui_AboveNeed(det_h, mt.margin, chrome_y, fit_rows, rhs, mt, ci) > fit_room) {
             var seq_n = (is_struct(cur_it) && variable_struct_exists(cur_it, "seq")) ? array_length(cur_it.seq) : 0;
-            var keeps = [lines_shown, Ui_DetailsKeepLines(lines_shown, 1), Ui_DetailsKeepLines(lines_shown, 2)];   // by level: 0 all, 1 kept, 2 last resort
+            var keeps = [lines_shown, Ui_DetailsKeepLines(lines_shown, 1), Ui_DetailsKeepLines(lines_shown, 2), Ui_DetailsKeepLines(lines_shown, 3)];   // by level: 0 all, 1 kept, 2 last resort, 3 none (I-107)
             var cols = L.details_cols;
             var sent = is_struct(cur_it) ? cur_it.help : "";
             // [lines level, keep the arrow strip, rows, hide the hint, the sentence's type step, tight: the panels share a border and the details have less air]
-            var steps = [[1, true, fit_rows, false, 0, false], [1, false, fit_rows, false, 0, false], [1, false, min(2, fit_rows), false, 0, false], [1, false, 1, false, 0, false], [1, false, 1, true, 0, false],
-                         [2, false, 1, true, 0, false], [2, false, 1, true, 1, false], [2, false, 1, true, 1, true]];
+            // I-107: a list of 2+ entries never goes below two rows until everything else has given way (rows2: two, or one when there is one entry to show); the one-row steps come last.
+            var rows2 = min(2, fit_rows);
+            var steps = [[1, true, fit_rows, false, 0, false], [1, false, fit_rows, false, 0, false], [1, false, rows2, false, 0, false], [1, false, rows2, true, 0, false],
+                         [2, false, rows2, true, 0, false], [2, false, rows2, true, 1, false], [2, false, rows2, true, 1, true],
+                         [3, false, rows2, true, 0, false], [3, false, rows2, true, 1, false], [3, false, rows2, true, 1, true],
+                         [1, false, 1, false, 0, false], [1, false, 1, true, 0, false], [2, false, 1, true, 0, false], [2, false, 1, true, 1, false], [2, false, 1, true, 1, true]];
             var pick = array_length(steps) - 1;
             var picked_h = -1;
             var picked_room = fit_room;
@@ -6460,10 +6465,10 @@ function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
             det_tight = steps[pick][5];
             det_h = picked_h;
             rows_lim = steps[pick][2];
+            if (det_tight) gap = -2 * p;
             if (rows_lim == 1) {   // R-106: a window of one row is as tall as the highlighted row (not the tallest); still too tall for the room: the gap between the panels shrinks to one pixel unit
                 one_row = true;
-                if (det_tight) gap = -2 * p;
-                else if (Ui_AboveNeed(det_h, gap, chrome_y, 1, rhs, mt, ci) > picked_room) gap = p;
+                if (!det_tight && Ui_AboveNeed(det_h, gap, chrome_y, 1, rhs, mt, ci) > picked_room) gap = p;
             }
         }
     }
@@ -6498,7 +6503,35 @@ function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
         det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
     }
     return { rect: rect, det_rect: det_rect, icon_px: icon_px, panel_w: panel_w, title_fit: title_fit, header_h: header_h, note_h: note_h, chrome_y: chrome_y, rhs: rhs, extra: extra, all_h: all_h, det_h: det_h, seq_drop: seq_drop,
-             gap: gap, det_right: det_right, list_room: list_room, panel_h: panel_h, total_h: total_h, px: px, py: py, slide: slide, det_above: det_above, list_y: list_y, det_y: det_y, one_row: one_row, rows_lim: rows_lim, rows_vis: rows_vis, lines_shown: lines_shown, lines_level: lines_level, hint_hidden: hint_hidden, det_step: det_step, det_tight: det_tight };
+             gap: gap, det_right: det_right, list_room: list_room, panel_h: panel_h, total_h: total_h, px: px, py: py, slide: slide, det_above: det_above, list_y: list_y, det_y: det_y, one_row: one_row, rows_lim: rows_lim, rows_vis: rows_vis, lines_shown: lines_shown, lines_level: lines_level, hint_hidden: hint_hidden, det_step: det_step, det_tight: det_tight, cue_on: (n > 0 && variable_struct_exists(L, "scroll_cue") && L.scroll_cue) };
+}
+
+// I-107: the scroll cue of a list (layout.scroll_cue, the battle Skill and Item lists): an up triangle at the top edge of the frame when rows are hidden above, a down triangle at
+// the bottom edge when rows are hidden below (both in the middle of the frame, 5p wide and 3p tall), and a "3/7" counter on a small plate at the bottom right corner (the plate sits
+// on the frame's bottom edge, 2p of it below the frame, 7p tall). _top = the list's first visible row. Rectangles { x, y, w, h }; w = 0 for an arrow that is not shown. Pure.
+function Ui_MenuCue(_m, _mt, _g, _top) {
+    var p = _mt.p;
+    var n = array_length(_m.items);
+    var none = { x: 0, y: 0, w: 0, h: 0 };
+    if (n <= 0) return { counter: "", counter_rect: none, up: none, down: none, digits_x: 0, digits_y: 0 };
+    var r = _g.rect;
+    var end_row = Ui_RowsEnd(_g.rhs, _top, _g.list_room);
+    var ax = r.x + (r.w - 5 * p) div 2;
+    var cur = clamp(_m.cursor, 0, n - 1);
+    var txt = string(cur + 1) + "/" + string(n);
+    var pw = Battle_DigitsWidth(txt, p) + 4 * p;
+    var plate = { x: r.x + r.w - p - pw, y: r.y + r.h - 5 * p, w: pw, h: 7 * p };
+    return { counter: txt, counter_rect: plate, digits_x: plate.x + 2 * p, digits_y: plate.y + p,
+             up: (_top > 0) ? { x: ax, y: r.y + p, w: 5 * p, h: 3 * p } : none,
+             down: (end_row < n - 1) ? { x: ax, y: r.y + r.h - 4 * p, w: 5 * p, h: 3 * p } : none };
+}
+
+// A triangle _dir -1 (apex up, widths 1 3 5 from the top) or +1 (apex down) in a 5p x 3p box at (_x, _y).
+function Ui_DrawTri(_x, _y, _dir, _p, _col) {
+    for (var i = 0; i < 3; i++) {
+        var wc = (_dir < 0) ? (1 + 2 * i) : (5 - 2 * i);
+        Ui_Box(_x + ((5 - wc) div 2) * _p, _y + i * _p, _x + ((5 - wc) div 2 + wc) * _p, _y + (i + 1) * _p, _col);
+    }
 }
 
 // Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
@@ -6666,8 +6699,15 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     if (n > 0) {
         Ui_Arrow(x0 + Ui_Bob(now) * p, band_y + (band_h - 5 * p) div 2, 1, p, UI_C_LIGHTEST);
     }
-    // a scroll hint when the list is longer than its window
-    if (n > 0 && (_m.top > 0 || vis_end < n - 1)) {
+    if (g.cue_on) {   // I-107: the triangles and the counter (the one-pixel marks below are for the other lists)
+        var cue = Ui_MenuCue(_m, mt, g, _m.top);
+        if (cue.up.w > 0) Ui_DrawTri(cue.up.x, cue.up.y, -1, p, UI_C_LIGHTEST);
+        if (cue.down.w > 0) Ui_DrawTri(cue.down.x, cue.down.y, 1, p, UI_C_LIGHTEST);
+        var pl = cue.counter_rect;
+        Ui_Box(pl.x, pl.y, pl.x + pl.w, pl.y + pl.h, UI_C_LIGHTEST);
+        Ui_Box(pl.x + p, pl.y, pl.x + pl.w - p, pl.y + pl.h - p, UI_C_DARKEST);
+        Battle_DrawDigits(cue.digits_x, cue.digits_y, cue.counter, p, UI_C_LIGHTEST);
+    } else if (n > 0 && (_m.top > 0 || vis_end < n - 1)) {   // a scroll hint when the list is longer than its window
         if (_m.top > 0) Ui_Box(px + panel_w - 4 * p, rows_y0 - p, px + panel_w - 3 * p, rows_y0, UI_C_LIGHT);
         if (vis_end < n - 1) Ui_Box(px + panel_w - 4 * p, rows_y0 + list_room, px + panel_w - 3 * p, rows_y0 + list_room + p, UI_C_LIGHT);
     }

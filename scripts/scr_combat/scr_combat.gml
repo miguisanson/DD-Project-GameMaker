@@ -2607,6 +2607,7 @@ function Battle_GlyphRows(_ch) {
         case "8": return [7, 5, 7, 5, 7];
         case "9": return [7, 5, 7, 1, 7];
         case "+": return [0, 2, 7, 2, 0];
+        case "/": return [1, 1, 2, 4, 4];   // I-107: the list counter "3/7"
         // D150: the letters of the short status names, in the same 3 x 5 cells
         case "A": return [2, 5, 7, 5, 5];
         case "B": return [6, 5, 6, 5, 6];
@@ -2772,7 +2773,7 @@ function Battle_ChipRectAdd(_who, _idx, _x, _y, _w, _h, _chip) {
     array_push(fr.chip_rects, { who: _who, idx: _idx, x: _x, y: _y, w: _w, h: _h, chip: _chip });
 }
 
-// The label, centred on _cx: the glyph name and count (white-green for a debuff, mid green for a buff); blinks light while 1 turn is left.
+// The label, centred on _cx: the glyph name and count, plain white (I-108); toggles white / light green while 1 turn is left.
 function Battle_DrawChipLabel(_cx, _y, _ch, _q, _lab_h) {
     var w = _ch.lw;
     var lx = round(_cx - w * 0.5);
@@ -3063,11 +3064,11 @@ function Battle_MenusBuild(_bc) {
     });
     _bc.ui_skill = Ui_MenuNew("battle_skill", Battle_SkillRows(_bc.p, _bc.e), {
         owner: _bc, on_confirm: Battle_SkillConfirm, refuse: Battle_MenuRefuse, on_back: Battle_ListBack,
-        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
+        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3, scroll_cue: true }
     });
     _bc.ui_item = Ui_MenuNew("battle_item", Battle_ItemRows(_bc.p), {
         owner: _bc, on_confirm: Battle_ItemConfirm, on_back: Battle_ListBack,
-        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3 }
+        layout: { x_anchor: "right", panel_w: z.right.w, y_bottom: z.list_bottom, details: true, details_pos: "above", details_cols: 2, rows_max: 3, scroll_cue: true }
     });
     _bc.ui_sig = { mp: _bc.p.mp, items: Battle_ItemSig(_bc.p), rev: Loc_GetRevision(), run: Battle_RunPct(_bc.p, _bc.e, _bc.run_fails), pv: Battle_SkillPreviewSig(_bc.p, _bc.e) };
 }
@@ -3103,7 +3104,7 @@ function Battle_MenusLayout(_bc) {
     var sts = [BSTATE_SKILL_MENU, BSTATE_ITEM_MENU];
     for (var i = 0; i < 2; i++) {
         var hint_h = Battle_ListHintRect({ x: 0, y: 0, w: ms[i].layout.panel_w, h: 0 }, sts[i]).h;
-        ms[i].layout.det_floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + ((hint_h > 0) ? hint_h + 2 * Ui_Px() : Ui_Px()) : -1;
+        ms[i].layout.det_floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + ((hint_h > 0) ? hint_h + Ui_Px() : Ui_Px()) : -1;   // I-107: the hint's plate stands right on the details panel, one pixel unit under the enemy
         ms[i].layout.det_floor_alt = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;   // the floor when the hint is left out because nothing else makes room
     }
 }
@@ -3174,24 +3175,34 @@ function Battle_HintLabels(_state) {
     return [];
 }
 
-// Where a list's prompt line stands: right-aligned just above the details panel _det (a rect { x, y, w, h }); { x, y, w, h, txt } or a zero rect when the state has no hint
-// or the panel is not up. Pure (the draw and the checks read it).
+// Where a list's prompt line stands: a small plate (darkest, a light outline) that stands on the top edge of the details panel _det (a rect { x, y, w, h }), right-aligned, with the line
+// in it (I-107: the line was light green on the picture behind and could not be read); { x, y, w, h, txt, tx, ty } (the plate, the line's text and where it starts) or a zero rect when the
+// state has no hint or the panel is not up. Pure (the draw and the checks read it).
 function Battle_ListHintRect(_det, _state, _hidden = false) {
-    var none = { x: 0, y: 0, w: 0, h: 0, txt: "" };
+    var none = { x: 0, y: 0, w: 0, h: 0, txt: "", tx: 0, ty: 0 };
     if (_det.w <= 0 || _hidden) return none;
     var hints = Battle_HintLabels(_state);
     if (array_length(hints) == 0) return none;
     var mt = Ui_Metrics();
     var txt = hints[0].text;
-    var lay = Prompt_RichLayout(txt, _det.w);
-    return { x: _det.x + _det.w - lay.line_w[0] - mt.p, y: _det.y - lay.h - mt.p, w: lay.line_w[0], h: lay.h, txt: txt };
+    var lay = Prompt_RichLayout(txt, _det.w - 6 * mt.p);
+    var pw = lay.line_w[0] + 4 * mt.p;
+    var ph = lay.h + 2 * mt.p;
+    var px = _det.x + _det.w - pw - 2 * mt.p;
+    return { x: px, y: _det.y - ph, w: pw, h: ph, txt: txt, tx: px + 2 * mt.p, ty: _det.y - ph + mt.p };
 }
 
-// The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
+// The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), on its plate on the details panel's top edge.
 function Battle_DrawListHint(_m, _state) {
     var hr = Battle_ListHintRect(_m.det_rect, _state, _m.hint_hidden);
     if (hr.w <= 0) return;
-    Prompt_RichDraw(hr.x, hr.y, hr.txt, _m.det_rect.w, UI_C_LIGHT, fa_left, Ui_MenuAlpha(_m, current_time));
+    var p = Ui_Metrics().p;
+    var a0 = draw_get_alpha();
+    draw_set_alpha(Ui_MenuAlpha(_m, current_time));
+    Ui_Box(hr.x, hr.y, hr.x + hr.w, hr.y + hr.h, UI_C_LIGHTEST);
+    Ui_Box(hr.x + p, hr.y + p, hr.x + hr.w - p, hr.y + hr.h, UI_C_DARKEST);
+    draw_set_alpha(a0);
+    Prompt_RichDraw(hr.tx, hr.ty, hr.txt, _m.det_rect.w, UI_C_TEXT, fa_left, Ui_MenuAlpha(_m, current_time));
 }
 
 function Battle_DrawMenus(_bc) {
@@ -3488,12 +3499,12 @@ function Battle_DrawEnemyShadow(_spr, _exs, _eys, _scx, _scy, _ws, _fade) {
     draw_set_color(c0);
 }
 
-// R3 (owner note 8): a chip on its last turn blinks by an outline round its icon cell (on / off every 250 ms) and its label toggling lightest / light;
+// R3 (owner note 8): a chip on its last turn blinks by an outline round its icon cell (on / off every 250 ms) and its label toggling white / light green (I-108);
 // never a filled box. { outline (draw the ring now), box (always false), label_col }.
 function Battle_ChipBlink(_last, _negative, _ms) {
     var lit = _last && (floor(_ms / 250) mod 2 == 0);
-    var col = _negative ? UI_C_LIGHTEST : UI_C_LIGHT;
-    if (_last) col = lit ? UI_C_LIGHTEST : UI_C_LIGHT;
+    var col = UI_C_TEXT;   // I-108: every label is plain white, a buff or a debuff
+    if (_last) col = lit ? UI_C_TEXT : UI_C_LIGHT;   // the last turn toggles white / light green with the outline
     return { outline: lit, box: false, label_col: col };
 }
 
