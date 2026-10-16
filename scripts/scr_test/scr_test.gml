@@ -149,6 +149,7 @@ function Test_RunAll() {
     Test_RunSuite("TextFit", Test_Suite_TextFit);
     Test_RunSuite("Hunt7Map", Test_Suite_Hunt7Map);
     Test_RunSuite("Hunt7Feel", Test_Suite_Hunt7Feel);
+    Test_RunSuite("Review7", Test_Suite_Review7);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14397,4 +14398,69 @@ function Test_Hunt7FeelBus() {
     }
     var _ui = ["ui_move", "ui_confirm", "ui_back", "ui_openclose", "ui_deny", "save_confirm"];
     for (var _j = 0; _j < array_length(_ui); _j++) Test_Eq("hunt7feel bus: " + _ui[_j] + " stays on the UI bus", SFX_CategoryForKey(_ui[_j]), "ui");
+}
+
+// ============================================================================================================================
+// Review 7 (session 7, findings 2, 3 and 4; finding 1, the attack plate R-085, is checked in smoke step 411): R-085..R-088.
+// ============================================================================================================================
+function Test_Suite_Review7() {
+    Test_RunSuite("Review7.focus", Test_Review7Focus);
+    Test_RunSuite("Review7.sprite", Test_Review7Sprite);
+    Test_RunSuite("Review7.historycols", Test_Review7HistoryCols);
+}
+
+// 2. R-086: a scenario that fails with the window "unfocused" must not freeze every later QTE of the run. Scenario_ClearUi, which every stage and every
+// failure path of the scripted runs goes through before the next part, puts the focus back.
+function Test_Review7Focus() {
+    var _had = variable_global_exists("focus_prev");
+    var _old = _had ? global.focus_prev : true;
+    global.focus_prev = false;
+    Test_Eq("review7 focus: (setup) an unfocused window freezes the QTE clock", Qte_StepMs(16000), 0);
+    Scenario_ClearUi();
+    Test_True("review7 focus: the scenario cleanup puts the focus back", global.focus_prev);
+    Test_True("review7 focus: the QTE clock runs again after it", Qte_StepMs(16000) > 0);
+    global.focus_prev = _old;
+}
+
+// 3. R-087: a saved sprite name that no longer resolves must not leave an opened chest closed: the swap sprite is the fallback, as for an old numeric save.
+function Test_Review7Sprite() {
+    var _open = chest_opened_asset;
+    var _shut = chest_asset;
+    var _a = { swapped: true, swap_sprite: _open, sprite_index: _shut };
+    RoomState_ApplySprite(_a, { sprite_name: "spr_no_longer_exists_in_this_build" });
+    Test_Eq("review7 sprite: a swapped chest with a lost sprite name shows the swap sprite", _a.sprite_index, _open);
+    var _b = { swapped: false, swap_sprite: _open, sprite_index: _shut };
+    RoomState_ApplySprite(_b, { sprite_name: "spr_no_longer_exists_in_this_build" });
+    Test_Eq("review7 sprite: an unswapped chest with a lost sprite name is left as it is", _b.sprite_index, _shut);
+    var _c = { swapped: true, swap_sprite: _shut, sprite_index: _shut };
+    RoomState_ApplySprite(_c, { sprite_name: "chest_opened_asset" });
+    Test_Eq("review7 sprite: a name that resolves is still used", _c.sprite_index, _open);
+    var _d = { swapped: true, swap_sprite: _open, sprite_index: _shut };
+    RoomState_ApplySprite(_d, { sprite_name: 12345 });
+    Test_Eq("review7 sprite: a name that is not even a string falls back too", _d.sprite_index, _open);
+}
+
+// 4. R-088: the Run History page picks its number-line columns for the window it is in; resizing (or changing the text scale) while it is open picks again.
+// For every start size and every size it is resized to, the open page ends with the columns a freshly opened page has there.
+function Test_Review7HistoryCols() {
+    var _s = TextFit_Begin();
+    var _sizes = TextFit_Sizes();
+    var _langs = ["en", "ko"];
+    var _differs = false;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _a = 0; _a < array_length(_sizes); _a++) {
+            TextFit_Set(_sizes[_a][0], _sizes[_a][1], _langs[_l]);
+            var _page = TabCodex_Page("history", TextFit_Profile());
+            var _m = TabCodex_MakeMenu("history", _page);
+            for (var _b = 0; _b < array_length(_sizes); _b++) {
+                TextFit_Set(_sizes[_b][0], _sizes[_b][1], _langs[_l]);
+                TabMenu_FitMenu(_m, TabMenu_Zones("codex_history"));
+                var _want = Codex_HistoryCols(_page.rows);
+                if (_want != _page.cols) _differs = true;
+                Test_Eq("review7 history: " + _langs[_l] + " opened at " + string(_sizes[_a][0]) + " then resized to " + string(_sizes[_b][0]) + " has the columns of that size", _m.layout.details_cols, _want);
+            }
+        }
+    }
+    Test_True("review7 history: (setup) some resize changes the column count, so the check can fail", _differs);
+    TextFit_End(_s);
 }

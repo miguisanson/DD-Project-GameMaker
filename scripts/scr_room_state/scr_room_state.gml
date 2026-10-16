@@ -226,14 +226,18 @@ function RoomState_SetAlive(_room, _persist_id) {
 // sprite takes that; otherwise the old number is used only when it is a real sprite. Nothing in the save is trusted to be a sprite: a name or number that is not one changes nothing.
 function RoomState_ApplySprite(_inst, _vars) {
     if (!is_struct(_vars)) return;
-    if (variable_struct_exists(_vars, "sprite_name")) {
+    var named = variable_struct_exists(_vars, "sprite_name");
+    if (named) {
         var nm = _vars.sprite_name;
         var spr = is_string(nm) ? asset_get_index(nm) : -1;
-        if (spr != -1 && sprite_exists(spr)) _inst.sprite_index = spr;
-        return;
+        if (spr != -1 && sprite_exists(spr)) {
+            _inst.sprite_index = spr;
+            return;
+        }
+        // R-087: a name that no longer resolves (a renamed sprite) falls through to the swap sprite, as an old save does; the old number is not trusted beside a name
     }
-    if (!variable_struct_exists(_vars, "sprite_index")) return;
-    var old = _vars.sprite_index;
+    var old = (!named && variable_struct_exists(_vars, "sprite_index")) ? _vars.sprite_index : undefined;
+    if (!named && is_undefined(old)) return;
     var swapped = variable_instance_exists(_inst, "swapped") && _inst.swapped;
     if (swapped && variable_instance_exists(_inst, "swap_sprite") && _inst.swap_sprite != noone && sprite_exists(_inst.swap_sprite)) {
         _inst.sprite_index = _inst.swap_sprite;

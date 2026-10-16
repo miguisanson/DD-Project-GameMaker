@@ -579,6 +579,7 @@ function TabMenu_Widths(_z, _list_need, _det_need) {
 
 // Fits a list menu into the Tab menu's body; _top_extra is room kept above the list (the Status card).
 function TabMenu_FitMenu(_m, _z, _top_extra = 0) {
+    TabCodex_HistoryRefit(_m, _z);
     var L = _m.layout;
     var mc = Ui_MenuMeasureRowsFresh(_m, _z.mt);
     var wd = TabMenu_Widths(_z, Ui_MenuListNeed(mc, _z.mt.p), mc.det_need);
@@ -982,18 +983,30 @@ function TabCodex_Page(_kind, _prof) {
     return { rows: Codex_UnlockRows(_prof), title: Loc_T("tab.codex.unlocks", "Unlocks"), cols: 1 };
 }
 
+// The menu of one Codex page (TabCodex_Page's rows, title and columns). The history page remembers the metrics its columns were picked for (R-088).
+function TabCodex_MakeMenu(_kind, _page) {
+    return Ui_MenuNew("codex_" + _kind, _page.rows, {
+        data: { tab: "codex_page", cols_mt: Ui_Metrics() },
+        layout: { title: _page.title, anchor: "center", details: true, details_pos: "right", details_cols: _page.cols, det_art: true, hides_below: true }
+    });
+}
+
+// R-088: the Run History page picks its number-line columns for the window it is in. The window or the text scale changing while the page is open (Ui_Metrics
+// hands out a new struct then) picks again, like the widths TabMenu_FitMenu re-fits every frame. Cheap while nothing changed: one compare.
+function TabCodex_HistoryRefit(_m, _z) {
+    if (_m.id != "codex_history" || !is_struct(_m.data)) return;
+    if (variable_struct_exists(_m.data, "cols_mt") && _m.data.cols_mt == _z.mt) return;
+    _m.data.cols_mt = _z.mt;
+    _m.layout.details_cols = Codex_HistoryCols(_m.items);
+}
+
 function TabCodex_Open(_kind) {
     var u = TabMenu_Get();
     var pg = u.pages[u.tab];
     var page = TabCodex_Page(_kind, Profile_Get());
     var rows = page.rows;
-    var title = page.title;
-    var cols = page.cols;
     if (array_length(rows) <= 0) return;
-    var m = Ui_MenuNew("codex_" + _kind, rows, {
-        data: { tab: "codex_page" },
-        layout: { title: title, anchor: "center", details: true, details_pos: "right", details_cols: cols, det_art: true, hides_below: true }
-    });
+    var m = TabCodex_MakeMenu(_kind, page);
     if (_kind == "notes") m.on_confirm = TabNote_OnConfirm;
     Ui_MenuFixCursor(m, m.cursor);
     Ui_StackPush(pg.stk, m);

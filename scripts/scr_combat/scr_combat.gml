@@ -4083,10 +4083,13 @@ function Battle_PreviewPlateLayout(_cmd, _z, _mt, _pv) {
 }
 
 // D135: with the cursor on ATTACK in the command menu, a plate beside it shows the damage against the current enemy at OK and at Perfect.
-// Remembers what it drew for the tests and the shots (hud.rects.preview, hud.preview_text); both stay empty on any other row.
+// Remembers what it drew for the tests and the shots: hud.rects.preview, hud.preview_text (the lines AS DRAWN, fitted and stacked as laid out, so a cut or a stacked
+// plate shows), hud.preview_plate (the two plain lines) and hud.preview_stacked; all stay empty on any other row.
 function Battle_DrawAttackPreview(_bc, _alpha) {
     _bc.hud.rects.preview = undefined;
     _bc.hud.preview_text = [];
+    _bc.hud.preview_plate = [];
+    _bc.hud.preview_stacked = false;
     var m = _bc.ui_cmd;
     if (array_length(m.items) <= 0 || m.items[m.cursor].id != "attack" || m.rect.w <= 0) return;
     var mt = Ui_Metrics();
@@ -4103,7 +4106,9 @@ function Battle_DrawAttackPreview(_bc, _alpha) {
     }
     draw_set_alpha(a0);
     _bc.hud.rects.preview = r;
-    _bc.hud.preview_text = pl.plate;
+    _bc.hud.preview_text = pl.lines;
+    _bc.hud.preview_plate = pl.plate;
+    _bc.hud.preview_stacked = pl.stacked;
 }
 
 // D134: "x2" in the top right corner while the battle runs at double speed.
