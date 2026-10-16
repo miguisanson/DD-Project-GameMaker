@@ -16079,7 +16079,8 @@ function Scenario_StepSmokeChoices(_s) {
                 Scenario_Check("choices_stranger_your_reaction_follows_his_reply", _c.watched && array_length(_c.boxes) == 3);
                 Scenario_Check("choices_stranger_the_encounter_is_used_up", !Dialogue_NarrativeIsPending("first_stranger_encounter_reaction") && Dialogue_NarrativeIsDone("first_stranger_encounter_reaction"));
                 Scenario_Check("choices_stranger_nothing_changed", Scenario_ChoiceVitals() == _h.vit);
-                _gs.flags = {};   // the next run: its flags are new, the profile remembers
+                _gs.flags = {};   // the next run: its flags are new, the profile remembers the answer
+                variable_struct_remove(Profile_Get().story_seen, "flag:" + Dialogue_NarrativeDoneFlagKey("first_stranger_encounter_reaction"));   // R-103: the profile now remembers that the reaction was seen too (it would not play again); this scene checks the greeting, so it is forgotten here
                 _h.c = Scenario_ChoiceNew();
                 _h.c.watch = json_stringify(DialogueDB_Get("sys_first_stranger_encounter_reaction"));
                 Dialogue_NarrativeOnStrangerEncounterResolved();
