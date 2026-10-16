@@ -3375,6 +3375,31 @@ function Battle_EnemyRect(_bc) {
     return { x: round(x0), y: round(y0), w: round(x1 - x0), h: round(y1 - y0) };
 }
 
+// R3 (owner notes 5, 23, 8) -- STUBS of the old behaviour, so the check of this packet can run red; replaced by the implementation in the next commit.
+function Battle_EnemyPlace(_spr) {
+    var sw = 16;
+    var sh = 16;
+    if (_spr != noone) { sw = sprite_get_width(_spr); sh = sprite_get_height(_spr); }
+    return { x: (DISPLAY_BASE_W div 2) - sw div 2, y: ((DISPLAY_BASE_H div 2) - 14) - sh div 2 };
+}
+
+function Battle_EnemyShadowRect(_bc) {
+    return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
+}
+
+function Battle_EnemyShadowGeom(_spr, _exs, _eys, _scx, _scy, _ws) {
+    return { x: 0, y: 0, w: 0, h: 0, ix: 0, iy: 0, iw: 0, ih: 0, cx: 0, cy: 0 };
+}
+
+function Battle_EnemyShadowAlpha(_fade) {
+    return { outer: 0, inner: 0 };
+}
+
+function Battle_ChipBlink(_last, _negative, _ms) {
+    var on = _last && (floor(_ms / 250) mod 2 == 0);
+    return { outline: false, box: on, label_col: _negative ? UI_C_LIGHTEST : UI_C_LIGHT };
+}
+
 function Battle_EnemyHeaderRectBuild(_bc) {
     Battle_HudBuilds().header++;
     var mt = Ui_Metrics();
@@ -3416,6 +3441,13 @@ function Battle_EnemyHeaderRectBuild(_bc) {
         out.chips_align = fa_right;
         out.chips_max = max(0, out.chips_x - mt.margin);
     }
+    // R3 stub: the row as the old layout draws it (what the new check looks at)
+    var cm0 = Battle_ChipMetrics(array_length(ech), 16 * Battle_IconK(), p, out.chips_max, Battle_ChipLws(ech));
+    var cx0 = out.chips_x;
+    if (out.chips_align == fa_right) cx0 = out.chips_x - cm0.w;
+    out.chips_shown = cm0.shown;
+    out.chips_more = cm0.more;
+    out.chips_rect = { x: cx0 - p, y: out.chips_y - p, w: cm0.w + 2 * p, h: cm0.c + p + Battle_ChipLabelH() + 2 * p };
     return out;
 }
 

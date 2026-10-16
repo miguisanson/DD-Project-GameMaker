@@ -150,6 +150,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt7Map", Test_Suite_Hunt7Map);
     Test_RunSuite("Hunt7Feel", Test_Suite_Hunt7Feel);
     Test_RunSuite("Review7", Test_Suite_Review7);
+    Test_RunSuite("R3Bvis", Test_Suite_R3Bvis);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14463,4 +14464,208 @@ function Test_Review7HistoryCols() {
     }
     Test_True("review7 history: (setup) some resize changes the column count, so the check can fail", _differs);
     TextFit_End(_s);
+}
+
+// ============================================================================================================================
+// Round 3 packet bvis (owner notes 5, 23, 8): R-092 (the snake covered by its plate and chips), R-093 (chip labels cut or overlapping), R-094 (a
+// bleed chip blinking for no visible reason). Expected values are the packet brief's: a soft shadow of two nested ellipses under every enemy, one
+// ground line for every enemy's feet, the plate and the chip row clear of the sprite at every size and language, and a last-turn blink that is an
+// outline round the icon (never a filled box).
+// ============================================================================================================================
+function Test_Suite_R3Bvis() {
+    Test_RunSuite("R3Bvis.ground", Test_R3Ground);
+    Test_RunSuite("R3Bvis.shadow", Test_R3Shadow);
+    Test_RunSuite("R3Bvis.layout", Test_R3Layout);
+    Test_RunSuite("R3Bvis.blink", Test_R3Blink);
+}
+
+// A stand-in battle controller for one enemy at the place a real battle gives it: the enemy (an elite when _mod is not ""), _nst of its statuses
+// (poison 3 stacks, bleed 2, burn 2, bloodthirsty 4, solidify 3, in that order), BREAK when _broke, a skill banner when _banner.
+function Test_R3Make(_id, _mod, _nst, _broke, _banner) {
+    var _pl = CharacterCreate_Player(CLASS_KNIGHT);
+    var _en = EnemyCreate(_id);
+    _en = Elite_Apply(_en, _mod);
+    var _ids = [STATUS_POISON, STATUS_BLEED, STATUS_BURN, STATUS_BLOODTHIRSTY, STATUS_SOLIDIFY];
+    var _tn = [0, 3, 2, 4, 3];
+    var _st = [3, 2, 1, 1, 1];
+    for (var _i = 0; _i < _nst && _i < 5; _i++) _en = Status_Add(_en, _ids[_i], _tn[_i], 0, _st[_i]);
+    _en.broken = _broke;
+    var _tl = Turn_New([Turn_Fighter(TL_PLAYER, 5), Turn_Fighter(TL_ENEMY, 4)]);
+    var _inst = instance_create_depth(0, 0, 0, obj_enemy_battle);
+    _inst.sprite_index = _en.sprite;
+    var _at = Battle_EnemyPlace(_en.sprite);
+    _inst.x = _at.x;
+    _inst.y = _at.y;
+    return { p: _pl, e: _en, tl: _tl, enemy_inst: _inst, cam_base_x: 0, cam_base_y: 0, skill_banner_active: _banner, skill_banner_name: "Fireball",
+             battle_state: BSTATE_ATTACK_TIMING, hud: { clock: 0, hp_shown: 1, mp_shown: 1, rects: {} } };
+}
+
+function Test_R3Rect(_x, _y, _w, _h) {
+    return { x: _x, y: _y, w: _w, h: _h };
+}
+
+// 1. The ground line: the opaque bottom of every enemy sprite is on one y, the picture is centred, and the biggest enemy still fits under the strip.
+function Test_R3Ground() {
+    var _first = undefined;
+    var _same = true;
+    var _list = "";
+    var _centred = true;
+    for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+        var _spr = EnemyDB_Get(_id).sprite;
+        var _at = Battle_EnemyPlace(_spr);
+        var _bottom = _at.y - sprite_get_yoffset(_spr) + sprite_get_bbox_bottom(_spr) + 1;
+        _list += string(_id) + ":" + string(_bottom) + " ";
+        if (is_undefined(_first)) _first = _bottom;
+        else if (_bottom != _first) _same = false;
+        if (abs((_at.x - sprite_get_xoffset(_spr) + sprite_get_width(_spr) * 0.5) - (DISPLAY_BASE_W * 0.5)) > 0.51) _centred = false;
+    }
+    Test_True("r3bvis ground: every enemy's opaque bottom is on the same world y (" + _list + ")", _same);
+    Test_True("r3bvis ground: every enemy is centred across the picture", _centred);
+    Test_True("r3bvis ground: the feet stand in the lower half of the picture, above the HUD", is_undefined(_first) ? false : (_first >= 72 && _first <= 96));
+}
+
+// 2. The shadow: 70% of the opaque width, a quarter of that high, centred under the feet a pixel or two below, two nested ellipses.
+function Test_R3Shadow() {
+    var _s = TextFit_Begin();
+    var _sizes = TextFit_Sizes();
+    var _bad = "";
+    var _bad_ground = "";
+    for (var _z = 0; _z < array_length(_sizes); _z++) {
+        TextFit_Set(_sizes[_z][0], _sizes[_z][1], "en");
+        var _ws = Display_WorldScale();
+        var _bottom0 = undefined;
+        for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+            var _bc = Test_R3Make(_id, "", 0, false, false);
+            var _er = Battle_EnemyRect(_bc);
+            var _sh = Battle_EnemyShadowRect(_bc);
+            var _tag = string(_id) + "@" + string(_sizes[_z][0]) + " ";
+            if (abs(_sh.w - _er.w * 0.7) > 2) _bad += _tag + "w=" + string(_sh.w) + "/" + string(_er.w * 0.7) + " ";
+            if (abs(_sh.h - _sh.w * 0.25) > 2) _bad += _tag + "h=" + string(_sh.h) + " ";
+            if (abs((_sh.x + _sh.w * 0.5) - (_er.x + _er.w * 0.5)) > 1.5) _bad += _tag + "cx ";
+            var _below = (_sh.y + _sh.h * 0.5) - (_er.y + _er.h);
+            if (_below < _ws - 1 || _below > 2 * _ws + 1) _bad += _tag + "below=" + string(_below) + " ";
+            if (!(_sh.iw > 0 && _sh.iw < _sh.w && _sh.ih > 0 && _sh.ih < _sh.h && abs((_sh.ix + _sh.iw * 0.5) - (_sh.x + _sh.w * 0.5)) <= 1.5)) _bad += _tag + "inner ";
+            if (is_undefined(_bottom0)) _bottom0 = _er.y + _er.h;
+            else if (_er.y + _er.h != _bottom0) _bad_ground += _tag;
+            instance_destroy(_bc.enemy_inst);
+        }
+    }
+    Test_Eq("r3bvis shadow: width 70% of the opaque width, height a quarter of it, under the feet, an inner ellipse (" + _bad + ")", _bad, "");
+    Test_Eq("r3bvis shadow: the feet of every enemy are on one GUI y at every size (" + _bad_ground + ")", _bad_ground, "");
+    TextFit_End(_s);
+
+    // it scales with the sprite's draw scale (push-in, recoil) and fades with the enemy
+    var _spr = EnemyDB_Get(ENEMY_SLIME).sprite;
+    var _a = Battle_EnemyShadowGeom(_spr, 100, 50, 3, 3, 3);
+    var _b = Battle_EnemyShadowGeom(_spr, 100, 50, 6, 6, 3);
+    var _c = Battle_EnemyShadowGeom(_spr, 100, 50, 3, 1.5, 3);
+    Test_True("r3bvis shadow: twice the draw scale is twice as wide and as high", _a.w > 0 && abs(_b.w / _a.w - 2) < 0.05 && abs(_b.h / _a.h - 2) < 0.1);
+    Test_True("r3bvis shadow: a squashed sprite (recoil) keeps its width and loses height", _c.w > 0 && abs(_c.w - _a.w) <= 1 && abs(_c.h / _a.h - 0.5) < 0.1);
+    var _f1 = Battle_EnemyShadowAlpha(1);
+    var _f2 = Battle_EnemyShadowAlpha(0.5);
+    var _f0 = Battle_EnemyShadowAlpha(0);
+    Test_True("r3bvis shadow: outer 0.25 and inner 0.4 at full strength", abs(_f1.outer - 0.25) < 0.001 && abs(_f1.inner - 0.4) < 0.001);
+    Test_True("r3bvis shadow: half faded is half as strong, faded out is gone", abs(_f2.outer - 0.125) < 0.001 && abs(_f2.inner - 0.2) < 0.001 && _f0.outer == 0 && _f0.inner == 0);
+}
+
+// 3. Plate and chips: clear of the opaque sprite and of each other, on screen, under the strip (and the skill banner), above the player panel, no chip cut.
+function Test_R3Layout() {
+    var _s = TextFit_Begin();
+    var _sizes = TextFit_Sizes();
+    var _langs = ["en", "ko"];
+    var _cases = [];
+    for (var _id = ENEMY_SLIME; _id <= ENEMY_FINAL_BOSS; _id++) {
+        array_push(_cases, { id: _id, em: "", nst: 4, brk: true });
+        array_push(_cases, { id: _id, em: "", nst: 5, brk: true });
+        array_push(_cases, { id: _id, em: "", nst: 0, brk: false });
+        if (_id <= ENEMY_KILLER_PLANT) {
+            array_push(_cases, { id: _id, em: "regenerating", nst: 4, brk: true });
+            array_push(_cases, { id: _id, em: "venomous", nst: 5, brk: true });
+            array_push(_cases, { id: _id, em: "armored", nst: 0, brk: false });
+        }
+    }
+    var _f = { plate_sprite: "", chips_sprite: "", chips_plate: "", screen: "", strip: "", panel: "", count: "", cut: "", name: "", setup: "" };
+    var _n = 0;
+    for (var _l = 0; _l < 2; _l++) {
+        for (var _z = 0; _z < array_length(_sizes); _z++) {
+            TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
+            var _gw = Display_GuiW();
+            var _gh = Display_GuiH();
+            var _mt = Ui_Metrics();
+            for (var _c = 0; _c < array_length(_cases); _c++) {
+                for (var _ban = 0; _ban < 2; _ban++) {
+                    var _k = _cases[_c];
+                    var _bc = Test_R3Make(_k.id, _k.em, _k.nst, _k.brk, _ban == 1);
+                    var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " e" + string(_k.id) + _k.em + " st" + string(_k.nst) + (_k.brk ? "+brk" : "") + (_ban == 1 ? " banner" : "") + "; ";
+                    _n++;
+                    var _hdr = Battle_EnemyHeaderRect(_bc);
+                    var _er = Battle_EnemyRect(_bc);
+                    var _pl = Test_R3Rect(_hdr.x1, _hdr.y1, _hdr.bw, _hdr.h);
+                    if (!variable_struct_exists(_hdr, "chips_rect")) { _f.setup = "no chips_rect on the header rect"; instance_destroy(_bc.enemy_inst); continue; }
+                    var _cr = _hdr.chips_rect;
+                    var _nchips = array_length(Battle_FighterChips(_bc, TL_ENEMY));
+                    var _have = _nchips > 0;
+                    var _top = Battle_TimelineBottom();
+                    var _ban_r = Battle_BannerRect(_bc);
+                    if (is_struct(_ban_r)) _top = max(_top, _ban_r.y + _ban_r.h);
+                    var _zones = Battle_Zones();
+                    if (Test_RectsOverlap(_pl, _er)) _f.plate_sprite += _tag;
+                    if (_have && Test_RectsOverlap(_cr, _er)) _f.chips_sprite += _tag;
+                    if (_have && Test_RectsOverlap(_cr, _pl)) _f.chips_plate += _tag;
+                    if (_pl.x < 0 || _pl.y < 0 || _pl.x + _pl.w > _gw || _pl.y + _pl.h > _gh || (_have && (_cr.x < 0 || _cr.y < 0 || _cr.x + _cr.w > _gw || _cr.y + _cr.h > _gh))) _f.screen += _tag;
+                    if (_pl.y < _top || (_have && _cr.y < _top)) _f.strip += _tag;
+                    if (Test_RectsOverlap(_pl, _zones.player) || (_have && Test_RectsOverlap(_cr, _zones.player))) _f.panel += _tag;
+                    if (_have && (_hdr.chips_shown + _hdr.chips_more != _nchips || _hdr.chips_shown < 1)) _f.count += _tag + "shown=" + string(_hdr.chips_shown) + " more=" + string(_hdr.chips_more) + "; ";
+                    if (_have && _cr.w > _hdr.chips_max + 2 * _mt.p) _f.cut += _tag + "w=" + string(_cr.w) + " max=" + string(_hdr.chips_max) + "; ";
+                    if (_pl.w < UI_TextWidth(Battle_EnemyName(_bc.e)) + 8 * _mt.p) _f.name += _tag;
+                    instance_destroy(_bc.enemy_inst);
+                }
+            }
+        }
+    }
+    Test_True("r3bvis layout: (setup) " + string(_n) + " layouts were looked at", _n >= 600);
+    Test_Eq("r3bvis layout: (setup) the header rect exposes the chip row", _f.setup, "");
+    Test_Eq("r3bvis layout: the plate never covers the enemy's opaque sprite", _f.plate_sprite, "");
+    Test_Eq("r3bvis layout: the chip row never covers the enemy's opaque sprite", _f.chips_sprite, "");
+    Test_Eq("r3bvis layout: the chip row and the plate do not overlap", _f.chips_plate, "");
+    Test_Eq("r3bvis layout: plate and chips are fully on screen", _f.screen, "");
+    Test_Eq("r3bvis layout: plate and chips stay under the turn strip and the banner", _f.strip, "");
+    Test_Eq("r3bvis layout: plate and chips stay off the player panel", _f.panel, "");
+    Test_Eq("r3bvis layout: every chip is shown or counted in a plus chip, at least one shown", _f.count, "");
+    Test_Eq("r3bvis layout: the chip row is never wider than the room it was given (no cut label)", _f.cut, "");
+    Test_Eq("r3bvis layout: the plate is wide enough for the longest name", _f.name, "");
+    TextFit_End(_s);
+}
+
+// 4. The last-turn blink is an outline round the chip's icon cell and a label that toggles lightest / light, never a filled box; it follows the turns left.
+function Test_R3Blink() {
+    var _on = Battle_ChipBlink(true, true, 0);
+    var _off = Battle_ChipBlink(true, true, 250);
+    var _on2 = Battle_ChipBlink(true, false, 500);
+    Test_True("r3bvis blink: on the lit beat of the last turn the icon cell is outlined", _on.outline);
+    Test_True("r3bvis blink: on the dark beat (250 ms later) the outline is off", !_off.outline);
+    Test_True("r3bvis blink: and it is on again 500 ms in", _on2.outline);
+    Test_True("r3bvis blink: never a filled box, on either beat", !_on.box && !_off.box && !_on2.box);
+    Test_True("r3bvis blink: the label is lightest on the lit beat and light on the dark beat", _on.label_col == UI_C_LIGHTEST && _off.label_col == UI_C_LIGHT && _on2.label_col == UI_C_LIGHTEST);
+    var _calm = Battle_ChipBlink(false, true, 0);
+    var _calm2 = Battle_ChipBlink(false, false, 0);
+    Test_True("r3bvis blink: a chip with turns left does not blink: no outline, no box", !_calm.outline && !_calm.box && !_calm2.outline && !_calm2.box);
+    Test_True("r3bvis blink: its label keeps its own colour (white-green for a debuff, mid green for a buff)", _calm.label_col == UI_C_LIGHTEST && _calm2.label_col == UI_C_LIGHT);
+
+    // R-094: a bleed blinks on its last TURN, not because its stack count is 1
+    var _ch = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch = Status_Add(_ch, STATUS_BLEED, 3, 0, 1);
+    var _c1 = Battle_StatusChips(_ch)[0];
+    Test_Eq("r3bvis blink: (setup) one bleed stack reads BLD 1", _c1.label, "BLD 1");
+    Test_True("r3bvis blink: a bleed with 1 stack and 3 turns left does not blink", !_c1.last);
+    var _ch2 = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch2 = Status_Add(_ch2, STATUS_BLEED, 1, 0, 3);
+    var _c2 = Battle_StatusChips(_ch2)[0];
+    Test_True("r3bvis blink: a bleed with 3 stacks and its last turn blinks", _c2.last);
+    var _ch3 = CharacterCreate_Player(CLASS_KNIGHT);
+    _ch3 = Status_Add(_ch3, STATUS_POISON, 0, 0, 1);
+    _ch3 = Status_Add(_ch3, STATUS_BURN, 1, 3);
+    var _c3 = Battle_StatusChips(_ch3);
+    Test_True("r3bvis blink: a poison never blinks (its count is stacks)", !_c3[0].last);
+    Test_True("r3bvis blink: a burn on its last turn blinks", _c3[1].last);
 }
