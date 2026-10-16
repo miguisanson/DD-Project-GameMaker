@@ -298,6 +298,8 @@ function SFX_RegisterDefaults() {
     SFX_RegisterResolved("ui_confirm", [Modern5, "Modern5", "ui_confirm"]);
     SFX_RegisterResolved("ui_back", [Modern6, "Modern6", "ui_back"]);
     SFX_RegisterResolved("ui_openclose", [Modern14, "Modern14", "ui_openclose"]);
+    // G11 (D133): a refusal (a buy that fails, a locked row, a wrong key, a bad arrow) has its own key. It plays the Modern6 back sound until the owner picks a refuse sound by ear: change this one line.
+    SFX_RegisterResolved("ui_deny", [Modern6, "Modern6", "ui_deny"]);
 
     // Dialogue (muted by design)
     SFX_Register("dialogue_open", noone);
@@ -445,6 +447,7 @@ function SFX_RegisterGainDefaults() {
     SFX_RegisterGain("ui_confirm", 1.00);
     SFX_RegisterGain("ui_back", 1.00);
     SFX_RegisterGain("ui_openclose", 1.00);
+    SFX_RegisterGain("ui_deny", 1.00);
 
     // Dialogue
     SFX_RegisterGain("dialogue_open", 0.00);
@@ -645,6 +648,7 @@ function SFX_DebugRequiredKeys() {
         "ui_confirm",
         "ui_back",
         "ui_openclose",
+        "ui_deny",
         "dialogue_open",
         "dialogue_advance",
         "dialogue_close",

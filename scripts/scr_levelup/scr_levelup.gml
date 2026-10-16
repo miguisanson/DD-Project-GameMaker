@@ -456,7 +456,7 @@ function Bed_MenuItems(_ch) {
         ]
     };
     var up = {
-        id: "upgrade", label: Loc_T("bed.option.upgrade", "Upgrade a skill"), value: (n > 0) ? "" : "-", kind: "button", enabled: (n > 0),
+        id: "upgrade", label: Loc_T("bed.option.upgrade", "Upgrade a Skill"), value: (n > 0) ? "" : "-", kind: "button", enabled: (n > 0),
         help: (n > 0) ? Loc_T("bed.help.upgrade", "Think over one of your skills and make it better for good.")
                       : Loc_T("bed.help.upgrade_none", "None of your skills can be upgraded any more."),
         lines: []

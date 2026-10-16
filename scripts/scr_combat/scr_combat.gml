@@ -1510,7 +1510,7 @@ function Battle_SkillQteStep(_bc) {
             _bc.sq_pop_ms = QTE_SEQ_POP_MS;
             _bc.sq_pop_idx = st.idx - 1;
         } else if (st.last == "wrong") {
-            SFX_PlayUI("ui_back");
+            SFX_PlayUI("ui_deny");
             _bc.sq_wrong_ms = QTE_SEQ_SHAKE_MS;
         }
     } else {
@@ -2958,14 +2958,14 @@ function Battle_CmdItems(_bc = undefined) {
     var run_val = "";
     if (!is_undefined(_bc) && variable_instance_exists(_bc, "p") && variable_instance_exists(_bc, "e")) {   // the battle controller (an instance) or a struct that looks like it
         var pct = Battle_RunPct(_bc.p, _bc.e, variable_instance_exists(_bc, "run_fails") ? _bc.run_fails : 0);
-        run_val = (pct < 0) ? Loc_T("battle.action.run_no", "no") : string(pct) + "%";
+        run_val = (pct < 0) ? Loc_T("battle.action.run_no", "No") : string(pct) + "%";
     }
     return [
-        { id: "attack", label: Loc_T("battle.action.attack", "ATTACK"), enabled: true },
-        { id: "skill", label: Loc_T("battle.action.skill", "SKILL"), enabled: true },
-        { id: "item", label: Loc_T("battle.action.item", "ITEM"), enabled: true },
-        { id: "guard", label: Loc_T("battle.action.guard", "GUARD"), enabled: true },
-        { id: "run", label: Loc_T("battle.action.run", "RUN"), value: run_val, enabled: true }
+        { id: "attack", label: Loc_T("battle.action.attack", "Attack"), enabled: true },
+        { id: "skill", label: Loc_T("battle.action.skill", "Skill"), enabled: true },
+        { id: "item", label: Loc_T("battle.action.item", "Item"), enabled: true },
+        { id: "guard", label: Loc_T("battle.action.guard", "Guard"), enabled: true },
+        { id: "run", label: Loc_T("battle.action.run", "Run"), value: run_val, enabled: true }
     ];
 }
 
@@ -3424,7 +3424,7 @@ function Battle_DrawEnemyHeader(_bc, _alpha) {
     var yy = hdr.y1 + 4 * p;
     if (variable_struct_exists(e, "is_elite") && e.is_elite) {   // C3 (D86): the tag above the name, pulsing like the outline on the map
         var pulse_col = (floor(current_time / 250) mod 2 == 0) ? UI_C_LIGHTEST : UI_C_LIGHT;
-        Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Loc_T("elite.tag", "ELITE"), pulse_col, fa_center);
+        Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Loc_T("elite.tag", "Elite"), pulse_col, fa_center);
         yy += mt.line_h + p;
     }
     Ui_Text(hdr.x1 + hdr.bw * 0.5, yy, Battle_EnemyName(e), UI_C_LIGHTEST, fa_center);

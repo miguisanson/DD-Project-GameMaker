@@ -17,7 +17,7 @@ function Equip_CanEquip(_ch, _item_or_id) {
     if (!variable_struct_exists(_ch, "class_id")) return out;
 
     if (!variable_struct_exists(_ch, "inventory") || !is_array(_ch.inventory) || !Inv_Has(_ch.inventory, item.id, 1)) {
-        out.msg = Loc_T("menu.msg.not_in_inventory", "Item not in inventory.");
+        out.msg = Loc_T("menu.msg.not_in_inventory", "Item not in bag.");
         return out;
     }
 

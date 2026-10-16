@@ -86,7 +86,7 @@ function Stat_Sentence(_stat_id) {
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
         case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
     }
-    return Loc_T("menu.tooltip.stat.default.desc", "Affects combat performance.");
+    return Loc_T("menu.tooltip.stat.default.desc", "Affects battle performance.");
 }
 
 function TabStatus_Items(_ch) {
@@ -131,7 +131,7 @@ function TabSkills_Items(_ch) {
         });
     }
     if (array_length(items) == 0) {
-        array_push(items, { id: "none", label: Loc_T("tab.skills.none", "No skills yet"), value: "", kind: "button", enabled: false, help: Loc_T("tab.skills.none_help", "Cards and chests teach skills. They appear here with the arrows to press."), lines: [], hint: "" });
+        array_push(items, { id: "none", label: Loc_T("tab.skills.none", "No Skills Yet"), value: "", kind: "button", enabled: false, help: Loc_T("tab.skills.none_help", "Cards and chests teach skills. They appear here with the arrows to press."), lines: [], hint: "" });
     }
     var ps = is_array(_ch.passives) ? _ch.passives : [];
     var passives = [];
@@ -161,7 +161,7 @@ function TabItems_Items(_ch, _in_battle = false) {
             if (grp != g) continue;
             var sentence = (it.type == ITEM_KEY) ? Loc_T("tab.items.key", "An item you keep for the way ahead.") : Item_Sentence(it);
             var lines = (it.type == ITEM_KEY) ? [] : Item_NumberLines(it, _ch);
-            array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(inv.qty) });
+            array_push(lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(inv.qty) });
             array_push(items, {
                 id: "item_" + string(it.id), label: it.name, value: "x" + string(inv.qty), kind: "button", enabled: true, item_id: it.id, throwable: Item_IsThrowable(it),
                 help: sentence, lines: lines, icon_item: it, hint: (grp == 0 && !_in_battle) ? Loc_T("tab.hint.use", "[k:confirm] Use") : ""
@@ -169,7 +169,7 @@ function TabItems_Items(_ch, _in_battle = false) {
         }
     }
     if (array_length(items) == 0) {
-        array_push(items, { id: "none", label: Loc_T("tab.items.none", "Nothing in your bag"), value: "", kind: "button", enabled: false, help: Loc_T("tab.items.none_help", "Potions, throwables and keys you find show up here."), lines: [], hint: "" });
+        array_push(items, { id: "none", label: Loc_T("tab.items.none", "Nothing in Your Bag"), value: "", kind: "button", enabled: false, help: Loc_T("tab.items.none_help", "Potions, throwables and keys you find show up here."), lines: [], hint: "" });
     }
     return items;
 }
@@ -180,7 +180,7 @@ function TabItems_Use(_ch, _item_id, _in_battle = false) {
     var item = ItemDB_Get(_item_id);
     var out = { ok: false, msg: Loc_T("item.msg.cant_use", "Can't use that."), ch: _ch };
     if (_in_battle) {
-        out.msg = Loc_T("menu.msg.items_in_fight", "In a fight, use ITEM in the battle menu.");
+        out.msg = Loc_T("menu.msg.items_in_fight", "In a battle, use Item in the battle menu.");
         return out;
     }
     if (!is_struct(item) || item.id == 0 || !Inv_Has(_ch.inventory, _item_id, 1)) return out;
@@ -200,11 +200,11 @@ function Gear_Slots() {
 
 function Gear_EmptyLabel(_slot) {
     switch (_slot) {
-        case "weapon": return Loc_T("tab.gear.no_weapon", "No weapon");
-        case "body": return Loc_T("tab.gear.no_armor", "No armor");
-        case "accessory": return Loc_T("tab.gear.no_accessory", "No accessory");
+        case "weapon": return Loc_T("tab.gear.no_weapon", "No Weapon");
+        case "body": return Loc_T("tab.gear.no_armor", "No Armor");
+        case "accessory": return Loc_T("tab.gear.no_accessory", "No Accessory");
     }
-    return Loc_T("tab.gear.empty", "Nothing worn");
+    return Loc_T("tab.gear.empty", "Nothing Equipped");
 }
 
 // The four stats as they would be with _item worn (or taken off, when it is worn) in its slot. The character is left as it was.
@@ -251,7 +251,7 @@ function TabGear_Row(_ch, _item, _slot, _worn) {
     return {
         id: "gear_" + string(_item.id), label: _item.name, value: "", kind: "button", enabled: true, item_id: _item.id, slot: _slot, worn: _worn,
         dim: (!_worn && !can.ok), help: sentence, lines: _worn ? Item_NumberLines(_item, _ch) : Gear_CompareLines(_ch, _item), icon_item: _item,
-        hint: _worn ? Loc_T("tab.hint.takeoff", "[k:confirm] Take off") : (can.ok ? Loc_T("tab.hint.equip", "[k:confirm] Equip") : "")
+        hint: _worn ? Loc_T("tab.hint.takeoff", "[k:confirm] Unequip") : (can.ok ? Loc_T("tab.hint.equip", "[k:confirm] Equip") : "")
     };
 }
 
@@ -294,7 +294,7 @@ function Gear_Toggle(_ch, _item_id, _in_battle = false) {
     var item = ItemDB_Get(_item_id);
     var out = { ok: false, equipped: false, msg: Loc_T("menu.msg.cant_equip", "Can't equip that."), ch: _ch };
     if (_in_battle) {
-        out.msg = Loc_T("menu.msg.gear_in_fight", "You can't change gear in a fight.");
+        out.msg = Loc_T("menu.msg.gear_in_fight", "You can't change gear during a battle.");
         return out;
     }
     if (!is_struct(item) || item.id == 0) return out;
@@ -414,7 +414,7 @@ function Codex_NoteCount(_prof) {
 
 // The Notes page title: how many of the notes are found.
 function Codex_NotesTitle(_prof) {
-    return Loc_T("tab.codex.notes_title", "Notes found {n}/{max}", { n: string(Codex_NoteCount(_prof)), max: string(array_length(Note_Defs())) });
+    return Loc_T("tab.codex.notes_title", "Notes Found {n}/{max}", { n: string(Codex_NoteCount(_prof)), max: string(array_length(Note_Defs())) });
 }
 
 // D147: a found note is a row with its title; Confirm opens the reader (note_id). One not found is ??? and opens nothing.
@@ -450,8 +450,8 @@ function Codex_HistoryRows(_prof) {
             sentence = Loc_T("tab.hist.won", "You climbed out of the tunnel.");
             value = Loc_T("tab.val.won", "Won");
         } else if (res == "abandoned") {
-            sentence = Loc_T("tab.hist.abandoned", "You gave this run up on floor {n}.", { n: string(fl) });
-            value = Loc_T("tab.val.abandoned", "Gave up");
+            sentence = Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(fl) });
+            value = Loc_T("tab.val.abandoned", "Abandoned");
         } else {
             sentence = (cause != "") ? Loc_T("tab.hist.died_to", "Floor {n}: felled by {name}.", { name: cause, n: string(fl) }) : Loc_T("tab.hist.died", "You fell on floor {n}.", { n: string(fl) });
             value = Loc_T("tab.val.floor", "Floor {n}", { n: string(fl) });
@@ -460,7 +460,7 @@ function Codex_HistoryRows(_prof) {
         // (D23), so those two lines gave way; the floor, the foes beaten and the seed stay.
         var lines = [
             { label: Loc_T("tab.lbl.floor", "Floor"), value: string(fl) },
-            { label: Loc_T("tab.lbl.kills", "Foes beaten"), value: string(variable_struct_exists(h, "kills") ? h.kills : 0) }
+            { label: Loc_T("tab.lbl.kills", "Enemies Beaten"), value: string(variable_struct_exists(h, "kills") ? h.kills : 0) }
         ];
         var stat_lines = RunStats_Lines(h);   // Perfect rate, crits, damage dealt / taken, fights won, run time ("-" for a run from before D137)
         for (var sl = 0; sl < array_length(stat_lines); sl++) array_push(lines, stat_lines[sl]);
@@ -494,9 +494,9 @@ function TabCodex_Items(_prof) {
           help: Loc_T("tab.codex.bestiary_help", "The enemies you have met: their numbers and their moves."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
         { id: "notes", label: Loc_T("tab.codex.notes", "Notes"), value: string(Codex_NoteCount(_prof)) + "/" + string(array_length(Note_Defs())), kind: "button", enabled: true,
           help: Loc_T("tab.codex.notes_help", "The notes you have read in the tunnel."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
-        { id: "history", label: Loc_T("tab.codex.history", "Run history"), value: string(runs), kind: "button", enabled: (runs > 0), dim: (runs <= 0),
+        { id: "history", label: Loc_T("tab.codex.history", "Run History"), value: string(runs), kind: "button", enabled: (runs > 0), dim: (runs <= 0),
           help: Loc_T("tab.codex.history_help", "Every run you have finished, newest first."),
-          lines: [{ label: Loc_T("tab.lbl.wins", "Wins"), value: string(_prof.wins) }, { label: Loc_T("tab.lbl.falls", "Falls"), value: string(_prof.deaths) }, { label: Loc_T("tab.lbl.best_floor", "Best floor"), value: string(_prof.best_floor) }],
+          lines: [{ label: Loc_T("tab.lbl.wins", "Wins"), value: string(_prof.wins) }, { label: Loc_T("tab.lbl.falls", "Falls"), value: string(_prof.deaths) }, { label: Loc_T("tab.lbl.best_floor", "Best Floor"), value: string(_prof.best_floor) }],
           hint: Loc_T("tab.hint.open", "[k:confirm] Open") },
         { id: "unlocks", label: Loc_T("tab.codex.unlocks", "Unlocks"), value: string(Profile_IsUnlocked(_prof, "nobody_class") ? 1 : 0) + "/1", kind: "button", enabled: true,
           help: Loc_T("tab.codex.unlocks_help", "What winning has opened up for later runs."), lines: [], hint: Loc_T("tab.hint.open", "[k:confirm] Open") }
@@ -559,7 +559,7 @@ function TabMenu_FitMenu(_m, _z, _top_extra = 0) {
 
 function TabMenu_Title(_id, _ch) {
     switch (_id) {
-        case "status": return Loc_T("tab.title.status", "Stats");
+        case "status": return Loc_T("tab.title.status", "Status");
         case "skills": return Loc_T("tab.title.skills", "Skills {n}/{max}", { n: string(array_length(_ch.skills)), max: string(CARD_MAX_SKILLS) });
         case "items": return Loc_T("tab.title.items", "Items");
         case "gear": return Loc_T("tab.title.gear", "Gear");
@@ -602,10 +602,10 @@ function TabSystem_Items(_in_battle = false) {
     return [
         { id: "help", label: Loc_T("pause.option.help", "Help"), value: "", kind: "button", enabled: true, lines: [], help: Loc_T("pause.help.help", "Every hint the game has: the ones you have seen and the ones still to come.") },
         { id: "abandon", value: "", kind: "button", enabled: true, lines: [],
-          label: Loc_T("pause.option.abandon", "Abandon run"),
+          label: Loc_T("pause.option.abandon", "Abandon Run"),
           help: Loc_T("pause.help.abandon", "Ends this run now. It counts as a death, but you keep the echo.") },
-        { id: "quit", label: Loc_T("pause.option.quit", "Quit to title"), value: "", kind: "button", enabled: true, lines: [],
-          help: _in_battle ? Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight.")
+        { id: "quit", label: Loc_T("pause.option.quit", "Quit to Title"), value: "", kind: "button", enabled: true, lines: [],
+          help: _in_battle ? Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle.")
                            : Loc_T("pause.help.quit", "Saves the run and goes to the title. Continue picks it up again.") }
     ];
 }
@@ -614,7 +614,7 @@ function TabSystem_Items(_in_battle = false) {
 function TabSystem_Question(_id, _in_battle = false) {
     switch (_id) {
         case "abandon": return Loc_T("confirm.abandon", "Abandon this run? It counts as a death, but you keep the echo.");
-        case "quit": return _in_battle ? Loc_T("confirm.quit_battle", "Quit to title? Continue puts you back just before this fight.")
+        case "quit": return _in_battle ? Loc_T("confirm.quit_battle", "Quit to title? Continue puts you back just before this battle.")
                                        : Loc_T("confirm.quit", "Quit to title? The run is saved and Continue picks it up again.");
     }
     return "";
@@ -675,7 +675,7 @@ function Help_StatsItems() {
 // The Help list: every tutorial, then the stats page.
 function TabHelp_Items() {
     var out = Tutorial_HelpItems();
-    array_push(out, { id: "stats_terms", label: Loc_T("help.stats.title", "Stats & terms"), value: "", kind: "button", enabled: true, lines: [], hint: "",
+    array_push(out, { id: "stats_terms", label: Loc_T("help.stats.title", "Stats & Terms"), value: "", kind: "button", enabled: true, lines: [], hint: "",
                       help: Loc_T("help.stats.help", "What Power, ATK, DEF, MAG, SPD, Crit, the grades, BREAK and every status mean.") });
     return out;
 }
@@ -698,7 +698,7 @@ function TabHelpStats_Open() {
     var pg = u.pages[u.tab];
     var m = Ui_MenuNew("help_stats", Help_StatsItems(), {
         data: { tab: "help_stats" },
-        layout: { title: Loc_T("help.stats.title", "Stats & terms"), anchor: "center", details: true, details_pos: "right", hides_below: true }
+        layout: { title: Loc_T("help.stats.title", "Stats & Terms"), anchor: "center", details: true, details_pos: "right", hides_below: true }
     });
     Ui_MenuFixCursor(m, m.cursor);
     Ui_StackPush(pg.stk, m);
@@ -908,7 +908,7 @@ function TabCodex_Open(_kind) {
             break;
         case "history":
             rows = Codex_HistoryRows(prof);
-            title = Loc_T("tab.codex.history", "Run history");
+            title = Loc_T("tab.codex.history", "Run History");
             break;
         default:
             rows = Codex_UnlockRows(prof);
@@ -1111,19 +1111,19 @@ function TabMenu_OnConfirm(_m, _i) {
     switch (_m.data.tab) {
         case "items":
             if (variable_struct_exists(it, "throwable") && it.throwable) {
-                SFX_PlayUI("ui_back");
+                SFX_PlayUI("ui_deny");
                 TabMenu_Toast(Loc_T("item.msg.throw_in_battle", "Throw it at an enemy in battle."));
                 break;
             }
             var r = TabItems_Use(ch, it.item_id, room == rm_battle);
-            if (r.ok) CardsUi_Commit(r.ch); else SFX_PlayUI("ui_back");
+            if (r.ok) CardsUi_Commit(r.ch); else SFX_PlayUI("ui_deny");
             TabMenu_Toast(r.msg);
             TabMenu_Refresh();
             break;
         case "gear":
             if (it.item_id < 0) break;
             var g = Gear_Toggle(ch, it.item_id, room == rm_battle);
-            if (g.ok) CardsUi_Commit(g.ch); else SFX_PlayUI("ui_back");
+            if (g.ok) CardsUi_Commit(g.ch); else SFX_PlayUI("ui_deny");
             TabMenu_Toast(g.msg);
             TabMenu_Refresh();
             break;
@@ -1193,10 +1193,10 @@ function TabMenu_Hint() {
         var it = m.items[clamp(m.cursor, 0, array_length(m.items) - 1)];
         if (variable_struct_exists(it, "hint")) txt = it.hint;
         else if (variable_struct_exists(it, "kind") && (it.kind == "choice" || it.kind == "slider")) txt = Loc_T("tab.hint.change", "{left}{right} Change");
-        else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "[k:confirm] Select");
+        else if (TabMenu_Ids()[TabMenu_Get().tab] == "settings") txt = Loc_T("tab.hint.select", "[k:confirm] Choose");
     }
     if (TabNote_IsReader(m) && NoteReader_MaxScroll(array_length(m.data.wrapped), m.data.visible) > 0) txt = Loc_T("tab.hint.scroll", "[k:up][k:down] Scroll");
-    if (NoteReader_Armed(m)) txt = Loc_T("tab.hint.select", "[k:confirm] Select");   // D154: the note's question is open and its replies can be used
+    if (NoteReader_Armed(m)) txt = Loc_T("tab.hint.select", "[k:confirm] Choose");   // D154: the note's question is open and its replies can be used
     if (txt != "") txt += "    ";
     return txt + ((TabMenu_Depth() > 1) ? Loc_T("tab.hint.back", "[k:back] Back") : Loc_T("tab.hint.close", "[k:back] Close"));
 }
@@ -1219,7 +1219,7 @@ function TabMenu_CardData(_mt) {
     global.tabmenu_card_builds = TabMenu_CardBuilds() + 1;
     c = {
         lang: lang, mt: _mt,
-        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "XP"), xp_max: Loc_T("tab.val.max", "MAX"),
+        hp: Loc_T("battle.hud.hp", "HP"), mp: Loc_T("battle.hud.mp", "MP"), xp: Loc_T("tab.lbl.xp", "EXP"), xp_max: Loc_T("tab.val.max", "MAX"),
         level_tpl: Loc_T("battle.hud.level", "Lv {n}"), seed_tpl: Loc_T("tab.lbl.seed_small", "Seed: {n}"),
         lab_w: 0, k_hp: -999, k_mp: -999, k_xp: -999, val_w: 0
     };
@@ -1473,7 +1473,7 @@ function CardsUi_ClassMenu(_prof = undefined) {
     }
     var m = Ui_MenuNew("cards_class", items, {
         on_confirm: CardsUi_ClassConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("class.select.title", "Select Class"), anchor: "center", details: true }
+        layout: { title: Loc_T("class.select.title", "Choose Class"), anchor: "center", details: true }
     });
     CardsUi_ClassFit(m);
     Ui_MenuFixCursor(m, 0);
@@ -1502,7 +1502,7 @@ function CardsUi_ClassFit(_m) {
 function CardsUi_ClassConfirm(_m, _i) {
     var it = _m.items[_i];
     if (it.locked) {
-        SFX_PlayUI("ui_back");
+        SFX_PlayUI("ui_deny");
         return;
     }
     Confirm_Open(Loc_T("class.select.become", "Become {cls}?", { cls: it.label }), CardsUi_ClassYes, { class_id: it.class_id });   // D156: the shared pop-up, No first
@@ -1568,7 +1568,7 @@ function CardsUi_EchoMenu() {
     }
     var m = Ui_MenuNew("run_echo", items, {
         on_confirm: CardsUi_EchoConfirm, on_back: CardsUi_NoBack,   // it must be answered
-        layout: { title: Loc_T("echo.pick.title", "Keep one skill you remember"), anchor: "center", details: true }
+        layout: { title: Loc_T("echo.pick.title", "Keep One Skill You Remember"), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, 0);   // the remembered cursor of an earlier screen does not count
     return m;
@@ -1599,7 +1599,7 @@ function CardsUi_StatHelp(_stat_id) {
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
         case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
-        case FREE_POINT_MAX_HP: return Loc_T("cards.stat.maxhp.desc", "Raises your max HP by {n} and heals {n} HP.", { n: FREE_POINT_HP_GAIN });   // D143
+        case FREE_POINT_MAX_HP: return Loc_T("cards.stat.maxhp.desc", "Raises your max HP by {n} and restores {n} HP.", { n: FREE_POINT_HP_GAIN });   // D143
         case FREE_POINT_MAX_MP: return Loc_T("cards.stat.maxmp.desc", "Raises your max MP by {n} and restores {n} MP.", { n: FREE_POINT_MP_GAIN });
     }
     return "";
@@ -1619,7 +1619,7 @@ function CardsUi_StatMenu() {
     }
     var m = Ui_MenuNew("cards_stat", items, {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
-        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: place 1 point", { lvl: string(ch.level) }), note: LevelUp_GrowthText(ch.class_id, ch.level), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(ch.level) }), note: LevelUp_GrowthText(ch.class_id, ch.level), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
     return m;
@@ -1648,12 +1648,12 @@ function CardsUi_ReplaceMenu() {
     var items = [];
     for (var i = 0; i < array_length(ch.skills); i++) {
         var sk = SkillDB_Get(ch.skills[i]);
-        array_push(items, { label: sk.name, value: Loc_T("card.mp_short", "{mp} MP", { mp: string(round(sk.mp_cost)) }), help: Loc_T("cards.replace.lose", "Gives up: {line}", { line: Card_SkillSentence(sk) }), lines: CardsUi_CompareLines(ch.skills[i], new_id), skill_id: ch.skills[i] });
+        array_push(items, { label: sk.name, value: Loc_T("card.mp_short", "{mp} MP", { mp: string(round(sk.mp_cost)) }), help: Loc_T("cards.replace.lose", "Loses: {line}", { line: Card_SkillSentence(sk) }), lines: CardsUi_CompareLines(ch.skills[i], new_id), skill_id: ch.skills[i] });
     }
-    array_push(items, { label: Loc_T("cards.replace.keep", "Keep my skills"), value: "", help: Loc_T("cards.replace.keep_help", "Go back to the cards and choose again."), lines: [], skill_id: -1 });
+    array_push(items, { label: Loc_T("cards.replace.keep", "Keep My Skills"), value: "", help: Loc_T("cards.replace.keep_help", "Go back to the cards and choose again."), lines: [], skill_id: -1 });
     var m = Ui_MenuNew("cards_replace", items, {
         on_confirm: CardsUi_ReplaceConfirm, on_back: CardsUi_ReplaceBack,
-        layout: { title: Loc_T("cards.replace.title", "Learn {skill}: replace which?", { skill: SkillDB_GetBase(new_id).name }), anchor: "center", details: true }
+        layout: { title: Loc_T("cards.replace.title", "Learn {skill}: Replace Which?", { skill: SkillDB_GetBase(new_id).name }), anchor: "center", details: true }
     });
     Ui_MenuFixCursor(m, 0);
     return m;
@@ -1829,9 +1829,9 @@ function CardsUi_DrawPick(_u, _a) {
         ch_max = max(ch_max, CardsUi_CardHeight(c, cw, mt));
     }
     var picks = GameState_Get().player_ch.card_picks;
-    var title = Loc_T("cards.pick.title", "Choose a card");
+    var title = Loc_T("cards.pick.title", "Choose a Card");
     if (picks > 1) title += "  " + Loc_T("cards.pick.left", "({n} picks left)", { n: string(picks) });
-    var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} gold", { gold: string(Card_SkipGold()) });
+    var skip_label = Loc_T("cards.pick.skip", "Skip: +{gold} Gold", { gold: string(Card_SkipGold()) });
     var skip_w = UI_TextWidth(skip_label) + 24 * p;
     var skip_h = mt.row_h + 4 * p;
     var hint = Loc_T("cards.pick.hint", "[k:left][k:right] Choose   [k:confirm] Take");
@@ -1925,7 +1925,7 @@ function BedUi_MainMenu() {
 function BedUi_UpgradeMenu() {
     var m = Ui_MenuNew("bed_upgrade", Bed_UpgradeItems(GameState_Get().player_ch), {
         on_confirm: BedUi_UpgradeConfirm, on_back: BedUi_OnBack,
-        layout: { title: Loc_T("bed.upgrade_title", "Upgrade which skill?"), anchor: "center", details: true, hides_below: true }
+        layout: { title: Loc_T("bed.upgrade_title", "Upgrade Which Skill?"), anchor: "center", details: true, hides_below: true }
     });
     Ui_MenuFixCursor(m, 0);
     return m;
@@ -2175,7 +2175,7 @@ function Controls_Items(_keys, _capture_row, _msg_row = "", _msg = "") {
         });
     }
     array_push(items, {
-        id: "reset", label: Loc_T("controls.reset", "Reset to defaults"), kind: "button", enabled: true, lines: [], value: "", help: Controls_RowHelp("reset")
+        id: "reset", label: Loc_T("controls.reset", "Reset to Defaults"), kind: "button", enabled: true, lines: [], value: "", help: Controls_RowHelp("reset")
     });
     return items;
 }
@@ -2265,7 +2265,7 @@ function ControlsPage_OnKey(_sp, _key) {
         SFX_PlayUI("ui_confirm");
         SettingsPopup_Refresh();
     } else {
-        SFX_PlayUI("ui_back");
+        SFX_PlayUI("ui_deny");
     }
     ControlsPage_Refresh(_sp);
     return true;
@@ -2387,7 +2387,7 @@ function ShopUi_ItemFor(_row, _ch, _gold) {
     var sold = (_row.qty <= 0);
     var out = { enabled: true, row: _row, can_buy: (!sold && _gold >= _row.price), label: "", value: "", help: "", lines: [] };
     out.dim = !out.can_buy;
-    out.value = sold ? Loc_T("shop.sold_out", "Sold out") : string(_row.price);
+    out.value = sold ? Loc_T("shop.sold_out", "Sold Out") : string(_row.price);
     if (_row.kind == "card") {
         var c = CardDB_Get(_row.id);
         out.label = Card_Name(c);
@@ -2399,9 +2399,9 @@ function ShopUi_ItemFor(_row, _ch, _gold) {
         out.help = Item_Sentence(it);
         out.lines = Item_NumberLines(it, _ch);
         out.icon_item = it;
-        if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) array_push(out.lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(Inv_Count(_ch.inventory, it.id)) });
+        if (it.type != ITEM_WEAPON && it.type != ITEM_ARMOR && it.type != ITEM_ACCESSORY) array_push(out.lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(Inv_Count(_ch.inventory, it.id)) });
     }
-    array_push(out.lines, { label: Loc_T("shop.lbl.in_stock", "In stock"), value: string(max(0, _row.qty)) });
+    array_push(out.lines, { label: Loc_T("shop.lbl.in_stock", "In Stock"), value: string(max(0, _row.qty)) });
     return out;
 }
 
@@ -2430,14 +2430,14 @@ function ShopUi_SellItems() {
         var worn = Menu_IsEquipped(ch, iid);
         var n = Inv_Count(ch.inventory, iid);
         var lines = Item_NumberLines(it, ch);
-        array_push(lines, { label: Loc_T("shop.lbl.sells_for", "Sells for"), value: string(Shop_SellPrice(iid)) });
-        array_push(lines, { label: Loc_T("shop.lbl.have", "You have"), value: string(n) });
+        array_push(lines, { label: Loc_T("shop.lbl.sells_for", "Sells For"), value: string(Shop_SellPrice(iid)) });
+        array_push(lines, { label: Loc_T("shop.lbl.have", "You Have"), value: string(n) });
         array_push(items, {
             enabled: true, dim: worn, label: it.name + ((n > 1) ? " x" + string(n) : ""), value: worn ? Loc_T("shop.worn", "Worn") : string(Shop_SellPrice(iid)),
             help: Item_Sentence(it), lines: lines, icon_item: it, item_id: iid
         });
     }
-    if (array_length(items) <= 0) array_push(items, { enabled: false, label: Loc_T("shop.nothing_to_sell", "Nothing to sell"), value: "", help: "", lines: [], item_id: -1 });
+    if (array_length(items) <= 0) array_push(items, { enabled: false, label: Loc_T("shop.nothing_to_sell", "Nothing to Sell"), value: "", help: "", lines: [], item_id: -1 });
     return items;
 }
 
@@ -2448,7 +2448,7 @@ function ShopUi_Refresh(_m, _which) {
 }
 
 function ShopUi_Title(_name) {
-    return _name + "  " + Loc_T("shop.gold", "Gold {n}", { n: string(Gold_Get()) });
+    return _name + "  " + Loc_T("shop.gold", "Gold: {n}", { n: string(Gold_Get()) });
 }
 
 function ShopUi_RootMenu() {
@@ -2500,7 +2500,7 @@ function ShopUi_ReasonText(_reason) {
         case "full": return Loc_T("shop.msg.full", "You cannot carry more of those.");
         case "owned": return Loc_T("shop.msg.owned", "You already have that.");
         case "slots": return Loc_T("shop.msg.slots", "All your skill slots are full.");
-        case "equipped": return Loc_T("shop.msg.equipped", "Take it off first.");
+        case "equipped": return Loc_T("shop.msg.equipped", "Unequip it first.");
     }
     return Loc_T("shop.msg.cant", "Cannot do that.");
 }
@@ -2510,7 +2510,7 @@ function ShopUi_BuyConfirm(_m, _i) {
     var it = _m.items[_i];
     var r = Shop_Buy(gs.player_ch, Run_Get(), it.row);
     if (!r.ok) {
-        SFX_PlayUI("ui_back");
+        SFX_PlayUI("ui_deny");
         ShopUi_Say(r.reason);
         return;
     }
@@ -2541,7 +2541,7 @@ function ShopUi_SellNow(_m, _item_id) {
     var gs = GameState_Get();
     var r = Shop_Sell(gs.player_ch, Run_Get(), _item_id);
     if (!r.ok) {
-        SFX_PlayUI("ui_back");
+        SFX_PlayUI("ui_deny");
         ShopUi_Say(r.reason);
         return;
     }
@@ -2865,7 +2865,7 @@ function KeepThis_Draw(_a = 1) {
     var mt = Ui_Metrics();
     var p = mt.p;
     var iw = min(mt.gw - 2 * mt.margin - 8 * p, 130 * p);
-    var t1 = Loc_T("settings.keep.title", "Keep this setting?");
+    var t1 = Loc_T("settings.keep.title", "Keep This Setting?");
     var t2 = Loc_T("settings.keep.body", "It goes back by itself in {n} s.", { n: string(ceil(KeepThis_Remaining() / 1000)) });
     var t3 = Loc_T("settings.keep.hint", "[k:confirm] Keep   [k:back] Revert");
     var l1 = Prompt_RichLayout(t1, iw);
@@ -2938,13 +2938,13 @@ function SettingsMenu_Items(_p, _scale_max) {
     array_push(items, Settings_VolumeRow("vol_bgm", Loc_T("settings.row.bgm", "BGM"), _p.audio_bgm,
         Loc_T("settings.help.vol_bgm", "How loud the music is.")));
 
-    var r_ts = Settings_Row("text_speed", Loc_T("settings.row.text_speed", "Text speed"), "choice",
+    var r_ts = Settings_Row("text_speed", Loc_T("settings.row.text_speed", "Text Speed"), "choice",
         Settings_TextSpeedText(ts), Loc_T("settings.help.text_speed", "How fast dialogue text appears."));
     r_ts.measure = [Settings_TextSpeedText(0), Settings_TextSpeedText(1), Settings_TextSpeedText(2)];
-    array_push(r_ts.lines, { label: Loc_T("settings.line.cps", "Chars per sec"), value: string(round(UI_DIALOGUE_CHARS_PER_SEC * Settings_TextSpeedMul(ts))) });
+    array_push(r_ts.lines, { label: Loc_T("settings.line.cps", "Chars per Sec"), value: string(round(UI_DIALOGUE_CHARS_PER_SEC * Settings_TextSpeedMul(ts))) });
     array_push(items, r_ts);
 
-    var r_sh = Settings_Row("shake", Loc_T("settings.row.shake", "Screen shake"), "choice",
+    var r_sh = Settings_Row("shake", Loc_T("settings.row.shake", "Screen Shake"), "choice",
         (_p.screen_shake != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
         Loc_T("settings.help.shake", "Screen shake when a hit lands: on or off."));
     r_sh.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
@@ -2956,7 +2956,7 @@ function SettingsMenu_Items(_p, _scale_max) {
     r_rm.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
     array_push(items, r_rm);
 
-    var r_qa = Settings_Row("qte_assist", Loc_T("settings.row.qte_assist", "QTE assist"), "choice",
+    var r_qa = Settings_Row("qte_assist", Loc_T("settings.row.qte_assist", "Timing Assist"), "choice",
         (_p.qte_assist != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
         Loc_T("settings.help.qte_assist", "Wider bar zones and more time on arrow skills."));
     r_qa.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
@@ -2974,7 +2974,7 @@ function SettingsMenu_Items(_p, _scale_max) {
     r_sc.enabled = windowed;
     r_sc.measure = [string(DISPLAY_SCALE_MAX) + "x", Loc_T("settings.value.auto", "Auto")];
     var wsz = Display_WindowSizeForScale(_p.display_scale);
-    array_push(r_sc.lines, { label: Loc_T("settings.line.window_size", "Window size"), value: string(wsz.w) + " x " + string(wsz.h) });
+    array_push(r_sc.lines, { label: Loc_T("settings.line.window_size", "Window Size"), value: string(wsz.w) + " x " + string(wsz.h) });
     array_push(items, r_sc);
 
     var r_lg = Settings_Row("language", Loc_T("settings.row.language", "Language"), "choice", Loc_LanguageDisplayName(_p.language),
@@ -3135,7 +3135,7 @@ function Title_MainItems(_can_load) {
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
         { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
-        { id: "exit", label: Loc_T("menu.main.option.3", "Exit Game"), kind: "button", enabled: true }
+        { id: "exit", label: Loc_T("menu.main.option.3", "Quit Game"), kind: "button", enabled: true }
     ];
 }
 
@@ -3207,11 +3207,11 @@ function Title_OnConfirm(_m, _i) {
 // of a first run). Back goes back to the title menu.
 function Title_SeedChoiceOpen(_c) {
     var m = Ui_MenuNew("seed_choice", [
-        { id: "random", label: Loc_T("seed.choice.random", "Random seed"), kind: "button", enabled: true },
-        { id: "enter", label: Loc_T("seed.choice.enter", "Enter seed"), kind: "button", enabled: true }
+        { id: "random", label: Loc_T("seed.choice.random", "Random Seed"), kind: "button", enabled: true },
+        { id: "enter", label: Loc_T("seed.choice.enter", "Enter Seed"), kind: "button", enabled: true }
     ], {
         owner: _c, on_confirm: Title_SeedChoiceConfirm,
-        layout: { title: Loc_T("seed.choice.title", "Choose a seed"), anchor: "center", center: true }
+        layout: { title: Loc_T("seed.choice.title", "Choose a Seed"), anchor: "center", center: true }
     });
     Ui_MenuFixCursor(m, 0);   // not the remembered row: Random is the default
     Ui_StackPush(_c.title_stk, m);
@@ -3271,7 +3271,7 @@ function Title_SeedEntryStep(_c) {
             _c.title_seed = undefined;
             Title_NewGameGo(_c);
         } else {
-            SFX_PlayUI("ui_back");
+            SFX_PlayUI("ui_deny");
             _c.title_seed_msg = true;
         }
     } else if (snap.back || snap.rclick) {
@@ -3319,7 +3319,7 @@ function Title_SeedEntryDraw(_c) {
     draw_set_alpha(a);
     var x0 = px + 4 * p;
     var yy = py + 4 * p;
-    Ui_Text(x0, yy, Loc_T("seed.entry.title", "Enter seed"), UI_C_LIGHTEST);
+    Ui_Text(x0, yy, Loc_T("seed.entry.title", "Enter Seed"), UI_C_LIGHTEST);
     Ui_Box(px + 3 * p, yy + lh + p, px + pw - 3 * p, yy + lh + 2 * p, UI_C_DARK);
     yy += lh + 3 * p + 5 * p;
     var rx = px + round((pw - row_w) / 2);
@@ -3471,8 +3471,8 @@ function Title_SplashAccepts(_age_ms) {
 
 // The prompt for the device used last (the glyph system has no "any" key, so it is two sentences).
 function Title_SplashPrompt(_device) {
-    if (_device == "gamepad") return Loc_T("title.splash.press_button", "Press any button");
-    return Loc_T("title.splash.press_key", "Press any key");
+    if (_device == "gamepad") return Loc_T("title.splash.press_button", "Press Any Button");
+    return Loc_T("title.splash.press_key", "Press Any Key");
 }
 
 // Any key, mouse button, pad button or stick, or one of the game's own actions (the scripted runs press by writing those).
@@ -3535,7 +3535,7 @@ function Title_FormatTime(_ms) {
 
 // { title, rows [{ label, value }] } as the details panel takes them (a sentence and number lines).
 function Title_CardText(_model) {
-    if (_model.kind == "cant") return { title: Loc_T("title.card.cant", "Can't continue"), rows: [] };
+    if (_model.kind == "cant") return { title: Loc_T("title.card.cant", "Can't Continue"), rows: [] };
     if (_model.kind != "run") return { title: "", rows: [] };
     var rows = [];
     if (_model.floor > 0) array_push(rows, { label: Loc_T("tab.lbl.floor", "Floor"), value: string(_model.floor) });

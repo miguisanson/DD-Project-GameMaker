@@ -47,3 +47,19 @@ Sentence case: messages, help lines, descriptions, confirm questions, tutorial b
 - `Health.` / `Magic points.` in `help.line.hp` / `help.line.mp` are the definitions of HP and MP, not labels, so they stay.
 - Glossary note: Inventory (소지품) is now `Bag` in English; the Korean word is unchanged. The glossary file lives outside the committed folders, so this line is the record.
 
+
+## One sound per action (G11, D133)
+
+Every UI sound is `SFX_PlayUI(key)` (scr_sfx); no screen calls `audio_play_sound`. The dialogue box keeps its own muted keys (`dialogue_open`, `dialogue_advance`, `dialogue_close`) by design.
+
+| Action | Key | Asset | Called from |
+|---|---|---|---|
+| Move the cursor / change a value | `ui_move` | Modern2 | `Ui_MenuUpdate`, tab switch, seed digits, note scroll, QTE arrow press |
+| Confirm / pick / close a notice | `ui_confirm` | Modern5 | `Ui_MenuUpdate`, pick screens, tutorial and notice close, Keep (settings) |
+| Back / leave a page / revert | `ui_back` | Modern6 | `Ui_MenuUpdate`, controls capture cancel, Keep revert |
+| Open or close a screen | `ui_openclose` | Modern14 | Tab menu, cards, bed, shop, settings, tutorial, choices |
+| Refuse (a buy that fails, a locked row, a bad key, an item that cannot be used, a wrong arrow, an empty seed) | `ui_deny` (new) | Modern6 for now | `SFX_PlayUI("ui_deny")` at the 9 refusal sites in scr_menu and scr_combat |
+
+Finding: G10 noted that a refusal plays `ui_confirm`; in fact the generic menu step plays `ui_confirm` when the row is activated and the refusing handler then plays the back sound on top. Refusals now have their own key, so one line in `SFX_RegisterDefaults` changes the refuse sound everywhere. No existing asset was a clean fit by name or use: `Blocked` is already the wall-bump and the Knight's block, and the Modern, Minimalist and Retro packs cannot be auditioned from a script. Until the owner picks one by ear (L5), `ui_deny` plays Modern6, so nothing sounds different yet.
+
+Dim: every backdrop goes through `Ui_DimBackdrop(UI_DIM_POPUP * a)` or `Ui_DimBackdrop(UI_DIM_SCREEN * a)` (G10's two named strengths); no other caller exists.

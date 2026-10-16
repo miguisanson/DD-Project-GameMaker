@@ -1053,7 +1053,7 @@ function Test_Suite_Qte() {
     // feedback: each grade has its own word and its own existing sound (QTE-12, GAP-01)
     SFX_EnsureManager();
     var _grades = ["PERFECT", "GOOD", "OK", "WEAK"];
-    var _words = ["PERFECT", "GOOD", "OK", "WEAK"];
+    var _words = ["Perfect", "Good", "OK", "Weak"];
     var _seen = [];
     for (var _gi = 0; _gi < 4; _gi++) {
         var _sk = Qte_GradeSfxKey(_grades[_gi]);
@@ -2632,7 +2632,7 @@ function Test_Suite_Loc() {
     Test_True("LOC-03 ko refusal is not the English text", Equip_CanEquip(_k, 0).msg != "Can't equip that.");
     Loc_SetLanguage("en");
     Test_Eq("LOC-03 Equip_CanEquip refusal (en)", Equip_CanEquip(_k, 0).msg, "Can't equip that.");
-    Test_Eq("LOC-03 Equip_CanEquip item not owned (en)", Equip_CanEquip(_k, 2).msg, "Item not in inventory.");
+    Test_Eq("LOC-03 Equip_CanEquip item not owned (en)", Equip_CanEquip(_k, 2).msg, "Item not in bag.");
     _k.inventory = Inv_Add(_k.inventory, 2, 1);
     var _can = Equip_CanEquip(_k, 2);
     Test_True("LOC-03 Equip_CanEquip owned weapon is ok", _can.ok);
@@ -4769,7 +4769,7 @@ function Test_Suite_MenuMeasure() {
     var _cb0 = TabMenu_CardBuilds();
     for (var _ci = 0; _ci < 300; _ci++) TabMenu_CardData(Ui_Metrics());
     Test_Eq("F1c 300 Status card data calls build nothing more", TabMenu_CardBuilds() - _cb0, 0);
-    Test_Eq("F1c the Status card knows its labels", _cd.hp + _cd.mp + _cd.xp, Loc_T("battle.hud.hp", "HP") + Loc_T("battle.hud.mp", "MP") + Loc_T("tab.lbl.xp", "XP"));
+    Test_Eq("F1c the Status card knows its labels", _cd.hp + _cd.mp + _cd.xp, Loc_T("battle.hud.hp", "HP") + Loc_T("battle.hud.mp", "MP") + Loc_T("tab.lbl.xp", "EXP"));
     Test_Eq("F1c the Status card's label width is the widest label", _cd.lab_w, max(UI_TextWidth(_cd.hp), max(UI_TextWidth(_cd.mp), UI_TextWidth(_cd.xp))));
     Test_Eq("F1c the level text equals Loc_T's", string_replace_all(_cd.level_tpl, "{n}", "7"), Loc_T("battle.hud.level", "Lv {n}", { n: "7" }));
     Test_Eq("F1c the seed text equals Loc_T's", string_replace_all(_cd.seed_tpl, "{n}", "123"), Loc_T("tab.lbl.seed_small", "Seed {n}", { n: "123" }));
@@ -6054,7 +6054,7 @@ function Test_Suite_TabMenu() {
     var _bad = Gear_Toggle(_g, 23);
     Test_False("D90 a robe cannot be equipped by the Knight", _bad.ok);
     Test_True("D90 the three slots come first, then the bag", _gi[0].kind == "head" && _gi[1].slot == "weapon" && _gi[2].slot == "body" && _gi[3].slot == "accessory");
-    Test_Eq("D90 an empty slot says what is missing", _gi[2].label + "/" + _gi[3].label, Loc_T("tab.gear.no_armor", "No armor") + "/" + Loc_T("tab.gear.no_accessory", "No accessory"));
+    Test_Eq("D90 an empty slot says what is missing", _gi[2].label + "/" + _gi[3].label, Loc_T("tab.gear.no_armor", "No Armor") + "/" + Loc_T("tab.gear.no_accessory", "No Accessory"));
     Test_True("D90 a bag item's sentence says what it replaces", string_pos(ItemDB_Get(1).name, _iron.help) > 0);
     Test_False("D90 an item for an empty slot replaces nothing", string_pos(Loc_T("tab.gear.replaces", "Replaces {item}.", { item: "" }), _plat.help) > 0);
 
@@ -7575,7 +7575,7 @@ function Test_Suite_FairUi() {
     var _cmd = Battle_CmdItems({ p: _k, e: _sl, run_fails: 0 });
     Test_Eq("R1b D124: the RUN row shows the chance", _cmd[4].value, "52%");
     var _cmd_b = Battle_CmdItems({ p: _k, e: EnemyCreate(ENEMY_FINAL_BOSS), run_fails: 0 });
-    Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "no"));
+    Test_Eq("R1b D124: against a boss the RUN row says no", _cmd_b[4].value, Loc_T("battle.action.run_no", "No"));
     Test_Eq("R1b D124: without a battle the RUN row has no number", Battle_CmdItems()[4].value, "");
 
     // ---- D124: Take Aim says how often it crits, from the bag size ----
@@ -7923,8 +7923,8 @@ function Test_Suite_Title() {
     Test_True("D128 fade-in: never goes back", Title_FadeIn(300) <= Title_FadeIn(600) && Title_FadeIn(600) <= Title_FadeIn(900));
     Test_True("D128 splash: a key in the first 200 ms is ignored", !Title_SplashAccepts(0) && !Title_SplashAccepts(199));
     Test_True("D128 splash: a key after 200 ms is taken", Title_SplashAccepts(200));
-    Test_Eq("D128 splash prompt: keyboard", Title_SplashPrompt("keyboard"), "Press any key");
-    Test_Eq("D128 splash prompt: controller", Title_SplashPrompt("gamepad"), "Press any button");
+    Test_Eq("D128 splash prompt: keyboard", Title_SplashPrompt("keyboard"), "Press Any Key");
+    Test_Eq("D128 splash prompt: controller", Title_SplashPrompt("gamepad"), "Press Any Button");
 
     // the Continue card text
     var _gold_l = Loc_T("tab.lbl.gold", "Gold");
@@ -7952,7 +7952,7 @@ function Test_Suite_Title() {
         var _mb = Title_CardModel({ status: _bad[_k], run: undefined });
         Test_Eq("D128 card: a " + _bad[_k] + " save says it cannot continue", _mb.kind, "cant");
         var _tb = Title_CardText(_mb);
-        Test_Eq("D128 card: " + _bad[_k] + " shows the short line", _tb.title, "Can't continue");
+        Test_Eq("D128 card: " + _bad[_k] + " shows the short line", _tb.title, "Can't Continue");
         Test_Eq("D128 card: " + _bad[_k] + " has no rows", array_length(_tb.rows), 0);
     }
     Test_Eq("D128 card text: nothing for no card", Title_CardText(Title_CardModel({ status: "missing", run: undefined })).title, "");
@@ -7989,8 +7989,8 @@ function Test_Suite_Title() {
     // Korean: the card and the prompt use the Korean strings
     Loc_SetLanguage("ko");
     Test_Eq("D128 ko: the Continue card class is Korean", Title_CardText(Title_CardModel({ status: "ok", run: _run })).title, Loc_T("class.name.class_archer", "Archer"));
-    Test_True("D128 ko: the prompt is not the English one", Title_SplashPrompt("keyboard") != "Press any key");
-    Test_True("D128 ko: the cannot-continue line is not the English one", Title_CardText(Title_CardModel({ status: "corrupt", run: undefined })).title != "Can't continue");
+    Test_True("D128 ko: the prompt is not the English one", Title_SplashPrompt("keyboard") != "Press Any Key");
+    Test_True("D128 ko: the cannot-continue line is not the English one", Title_CardText(Title_CardModel({ status: "corrupt", run: undefined })).title != "Can't Continue");
     Loc_SetLanguage(_lang0);
 }
 
@@ -9624,32 +9624,32 @@ function Test_Suite_RunStats() {
 
     // the rows: summary and Codex "Runs" page; an entry without stats shows "-"
     var _rows = RunFlow_SummaryRows(_he);
-    Test_Eq("D137 summary: Perfect rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect rate")), "25%");
-    Test_Eq("D137 summary: crits", Test_RowValue(_rows, Loc_T("stat.crits", "Crits landed")), "1");
-    Test_Eq("D137 summary: damage dealt", Test_RowValue(_rows, Loc_T("stat.dmg_dealt", "Damage dealt")), "77");
-    Test_Eq("D137 summary: damage taken", Test_RowValue(_rows, Loc_T("stat.dmg_taken", "Damage taken")), "33");
-    Test_Eq("D137 summary: fights won", Test_RowValue(_rows, Loc_T("stat.fights_won", "Fights won")), "3");
-    Test_Eq("D137 summary: run time", Test_RowValue(_rows, Loc_T("stat.time", "Run time")), "3:05");
-    Test_Eq("D137 summary: the old rows are still there", Test_RowValue(_rows, Loc_T("runflow.sum.kills", "Foes beaten")), string(_he.kills));
+    Test_Eq("D137 summary: Perfect rate", Test_RowValue(_rows, Loc_T("stat.perfect", "Perfect Rate")), "25%");
+    Test_Eq("D137 summary: crits", Test_RowValue(_rows, Loc_T("stat.crits", "Crits Landed")), "1");
+    Test_Eq("D137 summary: damage dealt", Test_RowValue(_rows, Loc_T("stat.dmg_dealt", "Damage Dealt")), "77");
+    Test_Eq("D137 summary: damage taken", Test_RowValue(_rows, Loc_T("stat.dmg_taken", "Damage Taken")), "33");
+    Test_Eq("D137 summary: fights won", Test_RowValue(_rows, Loc_T("stat.fights_won", "Battles Won")), "3");
+    Test_Eq("D137 summary: run time", Test_RowValue(_rows, Loc_T("stat.time", "Run Time")), "3:05");
+    Test_Eq("D137 summary: the old rows are still there", Test_RowValue(_rows, Loc_T("runflow.sum.kills", "Enemies Beaten")), string(_he.kills));
     var _bare = Run_MakeHistoryEntry(Run_Create(9146), _ch, "rm_floor1", "died", "");
     variable_struct_remove(_bare, "stats");
     var _brows = RunFlow_SummaryRows(_bare);
-    Test_True("D137 summary: an entry with no stats shows - on every stat row", Test_RowValue(_brows, Loc_T("stat.perfect", "Perfect rate")) == "-" && Test_RowValue(_brows, Loc_T("stat.crits", "Crits landed")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_dealt", "Damage dealt")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_taken", "Damage taken")) == "-" && Test_RowValue(_brows, Loc_T("stat.fights_won", "Fights won")) == "-" && Test_RowValue(_brows, Loc_T("stat.time", "Run time")) == "-");
+    Test_True("D137 summary: an entry with no stats shows - on every stat row", Test_RowValue(_brows, Loc_T("stat.perfect", "Perfect Rate")) == "-" && Test_RowValue(_brows, Loc_T("stat.crits", "Crits Landed")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_dealt", "Damage Dealt")) == "-" && Test_RowValue(_brows, Loc_T("stat.dmg_taken", "Damage Taken")) == "-" && Test_RowValue(_brows, Loc_T("stat.fights_won", "Battles Won")) == "-" && Test_RowValue(_brows, Loc_T("stat.time", "Run Time")) == "-");
     var _cp = Profile_Default();
     Profile_RecordRun(_cp, { seed: 1, class_id: CLASS_KNIGHT, level: 2, floor: 1, room: "rm_floor1", result: "died", cause: "Slime", kills: 1, gold: 5, at: 0 });
     Profile_RecordRun(_cp, _he);
     var _hrows = Codex_HistoryRows(_cp);
     Test_Eq("D137 Codex runs: two rows", array_length(_hrows), 2);
     var _hl = _hrows[0].lines;   // the newest first: the run with stats
-    Test_Eq("D137 Codex runs: Perfect rate", Test_RowValue(_hl, Loc_T("stat.perfect", "Perfect rate")), "25%");
-    Test_Eq("D137 Codex runs: crits", Test_RowValue(_hl, Loc_T("stat.crits", "Crits landed")), "1");
-    Test_Eq("D137 Codex runs: damage dealt", Test_RowValue(_hl, Loc_T("stat.dmg_dealt", "Damage dealt")), "77");
-    Test_Eq("D137 Codex runs: damage taken", Test_RowValue(_hl, Loc_T("stat.dmg_taken", "Damage taken")), "33");
-    Test_Eq("D137 Codex runs: fights won", Test_RowValue(_hl, Loc_T("stat.fights_won", "Fights won")), "3");
-    Test_Eq("D137 Codex runs: run time", Test_RowValue(_hl, Loc_T("stat.time", "Run time")), "3:05");
+    Test_Eq("D137 Codex runs: Perfect rate", Test_RowValue(_hl, Loc_T("stat.perfect", "Perfect Rate")), "25%");
+    Test_Eq("D137 Codex runs: crits", Test_RowValue(_hl, Loc_T("stat.crits", "Crits Landed")), "1");
+    Test_Eq("D137 Codex runs: damage dealt", Test_RowValue(_hl, Loc_T("stat.dmg_dealt", "Damage Dealt")), "77");
+    Test_Eq("D137 Codex runs: damage taken", Test_RowValue(_hl, Loc_T("stat.dmg_taken", "Damage Taken")), "33");
+    Test_Eq("D137 Codex runs: fights won", Test_RowValue(_hl, Loc_T("stat.fights_won", "Battles Won")), "3");
+    Test_Eq("D137 Codex runs: run time", Test_RowValue(_hl, Loc_T("stat.time", "Run Time")), "3:05");
     var _ol = _hrows[1].lines;   // the older entry has no stats
-    Test_True("D137 Codex runs: an old entry shows - for every stat", Test_RowValue(_ol, Loc_T("stat.perfect", "Perfect rate")) == "-" && Test_RowValue(_ol, Loc_T("stat.crits", "Crits landed")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_dealt", "Damage dealt")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_taken", "Damage taken")) == "-" && Test_RowValue(_ol, Loc_T("stat.fights_won", "Fights won")) == "-" && Test_RowValue(_ol, Loc_T("stat.time", "Run time")) == "-");
-    Test_Eq("D137 Codex runs: the old lines are still there", Test_RowValue(_ol, Loc_T("tab.lbl.kills", "Foes beaten")), "1");
+    Test_True("D137 Codex runs: an old entry shows - for every stat", Test_RowValue(_ol, Loc_T("stat.perfect", "Perfect Rate")) == "-" && Test_RowValue(_ol, Loc_T("stat.crits", "Crits Landed")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_dealt", "Damage Dealt")) == "-" && Test_RowValue(_ol, Loc_T("stat.dmg_taken", "Damage Taken")) == "-" && Test_RowValue(_ol, Loc_T("stat.fights_won", "Battles Won")) == "-" && Test_RowValue(_ol, Loc_T("stat.time", "Run Time")) == "-");
+    Test_Eq("D137 Codex runs: the old lines are still there", Test_RowValue(_ol, Loc_T("tab.lbl.kills", "Enemies Beaten")), "1");
 
     _gs.player_ch = _old_pl;
     _gs.ui.mode = _old_mode;
@@ -10106,7 +10106,7 @@ function Test_Suite_OneMenu() {
         _sys_lb += ((_i > 0) ? "," : "") + _sys[_i].label;
     }
     Test_Eq("D140 System rows", _sys_ids, "help/abandon/quit");
-    Test_Eq("D140 System labels", _sys_lb, "Help,Abandon run,Quit to title");
+    Test_Eq("D140 System labels", _sys_lb, "Help,Abandon Run,Quit to Title");
     var _all_on = (array_length(_sys) == 3);
     var _all_help = (array_length(_sys) == 3);
     for (var _i3 = 0; _i3 < array_length(_sys); _i3++) {
@@ -10119,9 +10119,9 @@ function Test_Suite_OneMenu() {
     var _all_on_b = (array_length(_sysb) == 3);
     for (var _i4 = 0; _i4 < array_length(_sysb); _i4++) _all_on_b = _all_on_b && _sysb[_i4].enabled;
     Test_True("D141 Abandon run and Quit to title are on in a battle", _all_on_b);
-    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this fight."));
+    Test_Eq("D141 in a battle Quit says it returns to just before the fight", (array_length(_sysb) == 3) ? _sysb[2].help : "", Loc_T("tab.system.quit_battle_help", "Goes back to the title. Continue puts you back just before this battle."));
     // D156 replaced the press-twice Abandon row by the shared Yes / No pop-up: the row always reads "Abandon run" (Test_Suite_Confirm checks the pop-up).
-    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 3) ? _sys[1].label : "", "Abandon run");
+    Test_Eq("D156 the Abandon row always reads Abandon run", (array_length(_sys) == 3) ? _sys[1].label : "", "Abandon Run");
 
     // ---- Settings: no Apply row, no pending copy; a change is live at once ----
     var _items = SettingsMenu_Items(GameSettings_Defaults(), 16);
@@ -10937,7 +10937,7 @@ function Test_ConfirmSystem() {
     Menu_Close(true);
     Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
     // the same row in a fight says what Continue will do
-    Test_Eq("H2 the Quit question in a fight", TabSystem_Question("quit", true), "Quit to title? Continue puts you back just before this fight.");
+    Test_Eq("H2 the Quit question in a fight", TabSystem_Question("quit", true), "Quit to title? Continue puts you back just before this battle.");
     Test_Eq("H2 the Abandon question is the same in a fight", TabSystem_Question("abandon", true), "Abandon this run? It counts as a death, but you keep the echo.");
 }
 
@@ -10954,7 +10954,7 @@ function Test_ConfirmNewGame() {
     Test_Eq("H2 the New Game pop-up starts on No", Confirm_Menu().cursor, 1);
     Test_False("H2 the first press starts no game", is_struct(_c.title_exit));
     Test_Eq("H2 the first press opens no seed pick yet", Ui_StackDepth(_c.title_stk), 1);
-    Test_Eq("H2 the row still reads New game", _m.items[0].label, "New game");
+    Test_Eq("H2 the row still reads New game", _m.items[0].label, "New Game");
     Test_False("H2 no armed flag is set by the press", variable_struct_exists(_c, "title_new_armed"));
     Confirm_Back();
     Test_False("H2 No starts no game", is_struct(_c.title_exit));
@@ -11099,8 +11099,8 @@ function Test_ConfirmNoArmed() {
     Test_True("H2 TabSystem_Disarm is gone", asset_get_index("TabSystem_Disarm") == -1);
     Test_True("H2 Title_NewArmed is gone", asset_get_index("Title_NewArmed") == -1);
     Test_True("H2 Title_DisarmNew is gone", asset_get_index("Title_DisarmNew") == -1);
-    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon run");
-    Test_Eq("H2 the title row never reads Sure", Title_MainItems(true)[0].label, "New game");
+    Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon Run");
+    Test_Eq("H2 the title row never reads Sure", Title_MainItems(true)[0].label, "New Game");
     var _gs = Test_Hero(CLASS_KNIGHT);
     var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
     Menu_Open(6);
@@ -11108,7 +11108,7 @@ function Test_ConfirmNoArmed() {
     Test_False("H2 the open menu keeps no sys_armed flag", variable_struct_exists(_u, "sys_armed"));
     TabMenu_OnConfirm(TabMenu_TopMenu(), 1);
     Test_False("H2 pressing Abandon sets no armed flag", variable_struct_exists(_u, "sys_armed"));
-    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[1].label, "Abandon run");
+    Test_Eq("H2 and leaves the row as it was", TabMenu_TopMenu().items[1].label, "Abandon Run");
     Confirm_Close();
     Menu_Close(true);
     Ui_MemSet(Ui_MemGlobal(), "tab_menu_active", _mem);
@@ -11740,11 +11740,11 @@ function Test_Suite_Notes() {
     var _r0 = Codex_NoteRows(Profile_Default());
     Test_Eq("D147 the page has a row for all 8", array_length(_r0), 8);
     Test_Eq("D147 nothing found: every row is ???", _r0[0].label + _r0[7].label, "??????");
-    Test_Eq("D147 the title counts what is found (none)", Codex_NotesTitle(Profile_Default()), "Notes found 0/8");
+    Test_Eq("D147 the title counts what is found (none)", Codex_NotesTitle(Profile_Default()), "Notes Found 0/8");
     var _r1 = Codex_NoteRows(_p2);
     Test_Eq("D147 a found note is listed by its title", _r1[0].label, "Torn survey page");
     Test_Eq("D147 the others stay ???", _r1[1].label, "???");
-    Test_Eq("D147 the title counts what is found (one)", Codex_NotesTitle(_p2), "Notes found 1/8");
+    Test_Eq("D147 the title counts what is found (one)", Codex_NotesTitle(_p2), "Notes Found 1/8");
     Test_Eq("D147 a found row knows which note it opens", _r1[0].note_id, "map_page");
     Test_False("D147 a ??? row opens nothing", variable_struct_exists(_r1[1], "note_id"));
     Test_True("D147 a found row's footer says Read", string_pos("Read", _r1[0].hint) > 0);
@@ -12430,7 +12430,7 @@ function Test_Suite_Labels() {
     Test_True("D156 the XP bar is thinner than the HP and MP bars", Ui_BarHeight("xp", 16, 2) < Ui_BarHeight("hp", 16, 2) && Ui_BarHeight("xp", 16, 2) == Ui_BarHeight("mp", 16, 2) div 2);
     Test_True("D156 the XP bar is still thick enough to read (2 pixels)", Ui_BarHeight("xp", 16, 2) >= 2 * 2);
     Test_True("D156 the XP bar is a whole number of pixels at every size", Ui_BarHeight("xp", 48, 6) mod 6 == 0 && Ui_BarHeight("xp", 32, 4) mod 4 == 0);
-    Test_Eq("D156 the XP bar is labelled XP", Loc_T("tab.lbl.xp", "?"), "XP");
+    Test_Eq("D156 (G11: EXP, one word) the experience bar is labelled EXP", Loc_T("tab.lbl.xp", "?"), "EXP");
 
     // ---- D156: the Gear header says Equipped, as a section header like Bag; no "Worn" is left in English ----
     var _gear = TabGear_Items(CharacterCreate_Player(CLASS_KNIGHT));
@@ -12455,7 +12455,7 @@ function Test_Suite_Labels() {
     var _hi = TabHelp_Items();
     Test_Eq("D156 the Help list has the 11 hints and the stats page", array_length(_hi), 12);
     Test_Eq("D156 the stats page is the last row", _hi[array_length(_hi) - 1].id, "stats_terms");
-    Test_Eq("D156 its title", _hi[array_length(_hi) - 1].label, "Stats & terms");
+    Test_Eq("D156 its title", _hi[array_length(_hi) - 1].label, "Stats & Terms");
     Test_Eq("D156 the hints keep their places", _hi[0].id, "timeline");
     var _terms = Help_StatsItems();
     var _tid = {};
@@ -13191,7 +13191,7 @@ function Test_Suite_Hunt6Combat() {
     Test_False("hunt6 menu: a potion is not drunk from the menu in a fight", _used.ok);
     Test_Eq("hunt6 menu: the refused potion did not heal", _k.hp, 1);
     Test_Eq("hunt6 menu: the refused potion is not spent", Inv_Count(_k.inventory, 10), 2);
-    Test_Eq("hunt6 menu: the refusal says to use ITEM in the battle menu", _used.msg, Loc_T("menu.msg.items_in_fight", "In a fight, use ITEM in the battle menu."));
+    Test_Eq("hunt6 menu: the refusal says to use ITEM in the battle menu", _used.msg, Loc_T("menu.msg.items_in_fight", "In a battle, use Item in the battle menu."));
     var _outside = TabItems_Use(_k, 10);
     Test_True("hunt6 menu: outside a fight the same potion is drunk", _outside.ok);
     var _kh = CharacterCreate_Player(CLASS_KNIGHT);
@@ -13205,7 +13205,7 @@ function Test_Suite_Hunt6Combat() {
     var _put = Gear_Toggle(_g, 22, true);
     Test_False("hunt6 menu: armor is not put on from the menu in a fight", _put.ok);
     Test_Eq("hunt6 menu: the body slot stays empty", Equip_SlotGet(_g, "body"), 0);
-    Test_Eq("hunt6 menu: the refusal says gear cannot change in a fight", _put.msg, Loc_T("menu.msg.gear_in_fight", "You can't change gear in a fight."));
+    Test_Eq("hunt6 menu: the refusal says gear cannot change in a fight", _put.msg, Loc_T("menu.msg.gear_in_fight", "You can't change gear during a battle."));
     var _take = Gear_Toggle(_g, 1, true);
     Test_False("hunt6 menu: the weapon is not taken off from the menu in a fight", _take.ok);
     Test_Eq("hunt6 menu: the weapon stays worn", Equip_SlotGet(_g, "weapon"), 1);

@@ -726,7 +726,7 @@ function Elite_Sentence(_mod) {
         case "venomous": return Loc_T("elite.line.venomous", "Venomous: its hits poison you for {n} stacks.", { n: string(ELITE_VENOM_STACKS) });
         case "swift": return Loc_T("elite.line.swift", "Swift: +{n} SPD.", { n: string(ELITE_SPD_BONUS) });
         case "brutal": return Loc_T("elite.line.brutal", "Brutal: +{n} ATK.", { n: string(ELITE_ATK_BONUS) });
-        case "regenerating": return Loc_T("elite.line.regenerating", "Regenerating: heals {pct}% of its HP each turn.", { pct: string(round(ELITE_REGEN_FRAC * 100)) });
+        case "regenerating": return Loc_T("elite.line.regenerating", "Regenerating: restores {pct}% of its HP each turn.", { pct: string(round(ELITE_REGEN_FRAC * 100)) });
     }
     return "";
 }
