@@ -14789,6 +14789,7 @@ function Test_R3Ground() {
     Test_True("r3bvis ground: every enemy's opaque bottom is on the same world y (" + _list + ")", _same);
     Test_True("r3bvis ground: every enemy is centred across the picture", _centred);
     Test_True("r3bvis ground: the feet stand in the lower half of the picture, above the HUD", is_undefined(_first) ? false : (_first >= 72 && _first <= 96));
+    Test_Eq("r3bvis ground: the line is Battle_GroundY (the HUD row's top edge, I-111: it was the fixed 80)", _first, Battle_GroundY());
 }
 
 // 2. The shadow: 70% of the opaque width, a quarter of that high, centred under the feet a pixel or two below, two nested ellipses.
@@ -16094,6 +16095,9 @@ function Test_R3FixDetLists() {
             for (var _k = 0; _k < 2; _k++) {
                 var _m = _menus[_k];
                 var _state = (_k == 0) ? BSTATE_SKILL_MENU : BSTATE_ITEM_MENU;
+                _bc.battle_state = _state;   // I-111: the list is open: the enemy stands lifted when the list has no room under its feet (Battle_ListLift)
+                Battle_MenusLayout(_bc);
+                _er = Battle_EnemyRect(_bc);
                 for (var _i = 0; _i < array_length(_m.items); _i++) {
                     _m.cursor = _i;
                     var _it = _m.items[_i];
@@ -19115,6 +19119,9 @@ function Test_R4Final1Lists() {
                             var _cnt = array_length(_m.items);
                             if (_cnt <= 0) continue;
                             if (_k == 1 && !(_c == 0 && _v == 1 && _e == 0)) continue;   // the item list: once per language and size, the full inventory against the boss
+                            _bc.battle_state = _state;   // I-111: the list is open: the enemy stands lifted when the list has no room under its feet (Battle_ListLift)
+                            Battle_MenusLayout(_bc);
+                            _er = Battle_EnemyRect(_bc);
                             var _top = 0;
                             var _seq = [];
                             for (var _a = 0; _a < _cnt; _a++) array_push(_seq, _a);
@@ -19449,9 +19456,10 @@ function Test_R4Final2Ground() {
                 // feet: on the line, less than one world pixel above it, never into the HUD
                 var _feet = _er.y + _er.h;
                 if (_feet > _zn.band_top || _feet < _zn.band_top - _ws - 0.5) _bad_feet += _tag + "feet=" + string(_feet) + " line=" + string(_zn.band_top) + "; ";
-                if (is_undefined(_bottom0)) _bottom0 = _feet; else if (_feet != _bottom0) _bad_same += _tag;
-                // a tall sprite: its top stays under the turn strip
-                if (_er.y < Battle_TimelineBottom()) _bad_top += _tag + "top=" + string(_er.y) + " strip=" + string(Battle_TimelineBottom()) + "; ";
+                if (is_undefined(_bottom0)) _bottom0 = _feet; else if (abs(_feet - _bottom0) > 1) _bad_same += _tag;   // (a fractional world scale rounds the rect by a unit)
+                // a tall sprite: its top stays under the turn strip; where the sprite is taller than the room between the strip and the HUD row (a boss in Korean, whose HUD row is taller, at the big sizes)
+                // the gap above is gone and the feet stay on the line (never the HUD): only the English HUD and the 32 px enemies are held to it
+                if ((_langs[_l] == "en" || _id < ENEMY_MINI_BOSS) && _er.y < Battle_TimelineBottom()) _bad_top += _tag + "top=" + string(_er.y) + " strip=" + string(Battle_TimelineBottom()) + "; ";
                 // the shadow's centre is a world pixel under the feet, so its upper half is covered by the feet
                 var _below = (_sh.y + _sh.h * 0.5) - _feet;
                 if (_below < _ws - 1 || _below > 2 * _ws + 1 || _sh.w <= 0) _bad_shadow += _tag + "below=" + string(_below) + "; ";
@@ -19463,7 +19471,7 @@ function Test_R4Final2Ground() {
     Test_Eq("r4final2 ground: the line is the player panel's top edge (whole world pixels, never below it, under one pixel above it)", _bad_hud, "");
     Test_Eq("r4final2 ground: every enemy's feet stand on the HUD row's top edge at every size (slime, spider, snake, whisp, plant, wolf, ghost sword, stranger, Palehorn, Choirbeast)", _bad_feet, "");
     Test_Eq("r4final2 ground: all enemies' feet are on one GUI y at each size", _bad_same, "");
-    Test_Eq("r4final2 ground: a tall sprite (Palehorn, Choirbeast) still has its top under the turn strip", _bad_top, "");
+    Test_Eq("r4final2 ground: a tall sprite (Palehorn, Choirbeast, English) and every 32 px enemy still have their top under the turn strip", _bad_top, "");
     Test_Eq("r4final2 ground: the shadow is right under the feet", _bad_shadow, "");
     // the window size changes in a fight: the enemy follows the layout
     TextFit_Set(480, 432, "en");

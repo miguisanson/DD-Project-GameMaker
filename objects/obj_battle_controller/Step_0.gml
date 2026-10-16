@@ -8,6 +8,15 @@ var real_ms = Presentation_StepMs(delta_time);
 var time_scale = Battle_TimeScale(self);
 var step_ms = real_ms * time_scale;
 Fx_BattleShakesStep(enemy_inst, step_ms);
+var lift_want = 0;   // I-111: a list that has no room under the feet lifts the enemy while it is open (Battle_MenusLayout works out how much)
+if (battle_state == BSTATE_SKILL_MENU) lift_want = list_lift[0];
+else if (battle_state == BSTATE_ITEM_MENU) lift_want = list_lift[1];
+if (Battle_EnemyRegound(enemy_inst, enemy_inst.sprite_index, lift_want)) {   // the window changed or a list opened: the enemy stands on its line, and its effects follow it
+    var enemy_c = FX_CenterOn(noone, enemy_inst);
+    enemy_fx_x = enemy_c.x;
+    enemy_fx_y = enemy_c.y;
+}
+lift_applied = lift_want;
 if (gs.ui.mode == UI_MENU || Tutorial_IsOpen() || Tutorial_JustClosed()) exit;
 Battle_FeelStep(self, step_ms, real_ms);   // D138 / D139: the feel clock, the death pop's clock, the low-HP heartbeat and the push-in (before any exit below)
 if (battle_over && battle_state != BSTATE_MESSAGE) exit;
