@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 26500 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 36000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 29000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 36000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -3049,6 +3049,9 @@ function Scenario_StepShots(_s) {
             break;
         case 1030: case 1031: case 1032: case 1033: case 1034: case 1035: case 1036: case 1037: case 1038: case 1039:
             Scenario_StepShotsR3Menus(_s);   // round 3 menus (R-096, R-097): the Gear and Skills headers, the reset question and notice in the game and on the title; the end of the pictures
+            break;
+        case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
+            Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -14346,16 +14349,164 @@ function Scenario_StepSmokeR3Light(_s) {
     }
 }
 
+// ---- Round 3 textfit2 pictures 1050..1059 (R-106): the Skills tab and the battle's Skill list with Horizontal Slash+, Poison Arrow+ and the other long names, and the Settings >
+// Controls page, at windowed scale 3 (480 x 432), 4 (640 x 576) and 5 (800 x 720); the Korean ones at scale 4. shot_r3textfit2_<scene>_<w>x<h>.png. The last pictures of the run. ----
+function Scenario_TF2Scenes() {
+    return ["skills", "battle_skills", "controls", "skills_ko", "controls_ko"];
+}
+
+function Scenario_TF2Scales(_di) {
+    return (_di >= 3) ? [4] : [3, 4, 5];
+}
+
+function Scenario_TF2Cleanup() {
+    Confirm_Close();
+    Notice_Interrupt();
+    if (is_struct(TabMenu_Get())) Menu_Close(true);
+    SettingsPopup_Close(true);
+    Scenario_ClearUi();
+}
+
+// Every row of a menu has a layout that fits (Ui_MenuMeasure ran on the last draw): nothing is cut.
+function Scenario_TF2RowsFit(_m, _tag) {
+    var _mc = variable_struct_exists(_m, "mc") ? _m.mc : undefined;
+    var _bad = "";
+    if (is_struct(_mc)) {
+        for (var _i = 0; _i < array_length(_mc.fits); _i++) {
+            if (is_struct(_mc.fits[_i]) && !_mc.fits[_i].ok) _bad += _m.items[_i].label + "; ";
+        }
+    }
+    Scenario_Check("shots_r3textfit2_every_row_fits_" + _tag, is_struct(_mc) && _bad == "", is_struct(_mc) ? _bad : "the menu was not measured");
+    return is_struct(_mc) ? _mc.extra_h : -1;
+}
+
+function Scenario_StepShotsTextFit2(_s) {
+    var _scenes = Scenario_TF2Scenes();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "tf2")) _s.tf2 = { n: 0, di: 0, si: 0 };
+    var _o = _s.tf2;
+    var _scales = Scenario_TF2Scales(_o.di);
+    var _scene = _scenes[_o.di];
+    var _tag = _scene + "_" + string(_scales[_o.si]);
+    var _battle = (_scene == "battle_skills");
+    var _ko = (string_pos("_ko", _scene) > 0);
+    switch (_s.step) {
+        case 1050:   // enter the room at this scale: a floor (two take turns) or a battle; a knight that knows the long names, every one upgraded
+            if (_s.t == 1) {
+                Scenario_ClearUi();
+                Dialogue_CloseNow();
+                Loc_SetLanguage("en");
+                var _g = Scenario_TabFixture();
+                var _k = _g.player_ch;
+                _k.skills = [SKILL_HORIZ_SLASH, SKILL_POISON_ARROW, SKILL_DOUBLE_SHOT, SKILL_POISON_MIST, SKILL_SCORCHING_TOUCH, SKILL_MUSCLE_UP];
+                _k.upgrades = [SKILL_HORIZ_SLASH, SKILL_POISON_ARROW, SKILL_DOUBLE_SHOT, SKILL_POISON_MIST, SKILL_SCORCHING_TOUCH];
+                Settings_SetKeys(Binds_Defaults());
+                Scenario_SetWindowScale(_scales[_o.si]);
+                if (_battle) {
+                    Scenario_GotoBattle("shots_tf2_" + string(_o.n), ENEMY_SPIDER);
+                } else {
+                    _o.n++;
+                    room_goto((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3);
+                }
+            }
+            if (_s.t >= 25) {
+                if (_battle ? (room == rm_battle && instance_exists(obj_battle_controller)) : Scenario_FloorReady((_o.n mod 2 == 1) ? rm_floor2 : rm_floor3)) Scenario_Next(_s, 1051);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_r3textfit2_enters_the_room_" + _tag, false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1051:   // set the scene up (the language after the room: a room's controller reloads it from the settings)
+            Loc_SetLanguage(_ko ? "ko" : "en");
+            if (_battle) {
+                var _bc = instance_find(obj_battle_controller, 0);
+                _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+                _bc.p.skills = _gs.player_ch.skills;
+                _bc.p.mp = _bc.p.max_mp;
+                _bc.tl_who = TL_PLAYER;
+                _bc.turn = TURN_PLAYER;
+                _bc.enemy_action_pending = false;
+                _bc.battle_state = BSTATE_MENU;
+            } else {
+                with (obj_enemy) instance_destroy();
+                Menu_Open(string_pos("controls", _scene) == 1 ? 5 : 1);
+            }
+            Scenario_Next(_s, 1052);
+            break;
+        case 1052:   // let it settle, open the list or the Controls page, then check and take the picture
+            if (_battle) {
+                if (_s.t == 4) {
+                    var _bc2 = instance_find(obj_battle_controller, 0);
+                    Battle_OpenList(_bc2, BSTATE_SKILL_MENU);
+                    _bc2.ui_skill.cursor = 0;
+                }
+                if (_s.t < 24) break;
+            } else if (string_pos("controls", _scene) == 1) {
+                SettingsPopup_Ensure();
+                var _sp = _gs.ui.settings_popup;
+                if (!variable_struct_exists(_s, "tf2_c") && SettingsPopup_IsOpen() && _s.t >= 12) {
+                    _s.tf2_c = true;
+                    ControlsPage_Open(_sp);
+                    Ui_MenuFixCursor(_sp.controls.menu, 0);
+                    _s.tf2_t = _s.t;
+                }
+                if (!variable_struct_exists(_s, "tf2_c")) {
+                    if (_s.t > 300) { Scenario_Check("shots_r3textfit2_the_settings_open_" + _tag, false); Scenario_TF2Cleanup(); Scenario_NoticeEnd(); }
+                    break;
+                }
+                if (_s.t < _s.tf2_t + 30) break;
+            } else if (_s.t < 24) {
+                break;
+            }
+            _s.shot = "shot_r3textfit2_" + _scene + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+            if (_battle) {
+                var _bc3 = instance_find(obj_battle_controller, 0);
+                Scenario_Check("shots_r3textfit2_the_skill_list_is_open_" + _tag, _bc3.battle_state == BSTATE_SKILL_MENU && array_length(_bc3.ui_skill.items) == 6, "state=" + string(_bc3.battle_state));
+                var _ex = Scenario_TF2RowsFit(_bc3.ui_skill, _tag);
+                Scenario_Check("shots_r3textfit2_the_long_names_make_taller_rows_" + _tag, _scales[_o.si] >= 4 ? _ex > 0 : _ex >= 0, "extra=" + string(_ex));
+                Scenario_BattleUiOverlaps(_bc3, "textfit2_" + _tag);
+                Scenario_Check("shots_r3textfit2_the_list_is_on_screen_" + _tag, _bc3.hud.rects.list.x >= 0 && _bc3.hud.rects.list.y + _bc3.hud.rects.list.h <= Display_GuiH(), json_stringify(_bc3.hud.rects.list));
+            } else if (string_pos("controls", _scene) == 1) {
+                Scenario_Check("shots_r3textfit2_the_controls_page_is_open_" + _tag, is_struct(_gs.ui.settings_popup.controls) && array_length(_gs.ui.settings_popup.controls.menu.items) == 11);
+                Scenario_TF2RowsFit(_gs.ui.settings_popup.controls.menu, _tag);
+                Scenario_TabLayoutChecks(_tag);
+            } else {
+                Scenario_Check("shots_r3textfit2_skills_menu_is_open_" + _tag, _gs.ui.mode == UI_MENU && is_struct(TabMenu_Get()) && TabMenu_Ids()[TabMenu_Get().tab] == "skills", "mode=" + string(_gs.ui.mode));
+                var _skm = TabMenu_TopMenu();
+                Scenario_Check("shots_r3textfit2_skills_has_the_long_names_" + _tag, _skm.items[0].label == SkillDB_Get(SKILL_HORIZ_SLASH).name && _skm.items[1].label == SkillDB_Get(SKILL_POISON_ARROW).name, _skm.items[0].label);
+                Scenario_TF2RowsFit(_skm, _tag);
+                Scenario_TabLayoutChecks(_tag);
+            }
+            Scenario_ShotLayout(_s.shot);
+            Scenario_Next(_s, 1053);
+            break;
+        case 1053:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Scenario_TF2Cleanup();
+                variable_struct_remove(_s, "tf2_c");
+                variable_struct_remove(_s, "tf2_t");
+                _o.si++;
+                if (_o.si >= array_length(Scenario_TF2Scales(_o.di))) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                } else {
+                    Scenario_Next(_s, 1050);
+                }
+            }
+            break;
+    }
+}
+
 // ---- Round 3 menus pictures 1030..1039: the Gear tab (Equipped and Bag headers, No Armor and No Accessory under them), the Skills tab (the Passives header), the Controls
 // page's reset question and the notice after it (in the game), and the same question and notice over the title's settings; windowed scale 3 (480 x 432), 4 (640 x 576) and 5
-// (800 x 720) (the Controls scenes at 3 and 5 only), the title ones at 3 only. shot_r3menus_<scene>_<w>x<h>.png. The last pictures of the run: they end it. ----
+// (800 x 720) (the Controls scenes too), the title ones at 3 only. shot_r3menus_<scene>_<w>x<h>.png. They go on with the round 3 textfit2 pictures (1050), the end of the run. ----
 function Scenario_R3Scenes() {
     return ["gear", "skills", "reset_ask", "reset_notice", "reset_flash", "title_ask", "title_notice"];
 }
 
 function Scenario_R3Scales(_di) {
     if (_di >= 5) return [3];
-    if (_di >= 2) return [3, 5];   // the Controls page at 640 x 576 cuts its first label ('Confi..': a layout fault of the Settings tab that is not this packet's, reported)
     return [3, 4, 5];
 }
 
@@ -14512,7 +14663,7 @@ function Scenario_StepShotsR3Menus(_s) {
                 if (_o.si >= array_length(Scenario_R3Scales(_o.di))) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_NoticeEnd();   // the end of the pictures: removes the files and the profile the steps made
+                    Scenario_Next(_s, 1050);   // goes on with the round 3 textfit2 pictures, the end of the pictures
                 } else {
                     Scenario_Next(_s, 1030);
                 }
