@@ -510,7 +510,7 @@ class ExportCarriesWeakPoints(unittest.TestCase):
             self.assertIn("resist", e, e["name"])
 
     def test_the_lists_are_the_games(self):
-        want = {0: (sim.BURN, sim.BLEED), 1: (sim.BURN, sim.POISON), 2: (sim.BLEED, sim.POISON), 3: (sim.POISON, sim.BURN), 8: (sim.BURN, -1), 9: (sim.POISON, -1)}
+        want = {0: (sim.BURN, sim.BLEED), 1: (sim.BLEED, sim.POISON), 2: (sim.POISON, sim.BLEED), 3: (sim.BURN, sim.POISON), 7: (sim.BLEED, sim.BURN), 8: (sim.BURN, -1), 9: (sim.POISON, -1)}   # slime, wolf, ghost sword, spider, stranger, mini boss, final boss
         for eid, (w, r) in want.items():
             e = sim.make_enemy(R, eid, 1)
             self.assertEqual((e.weak, e.resist), (w, r), D.enemies[eid]["name"])

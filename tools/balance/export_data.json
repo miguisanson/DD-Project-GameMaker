@@ -1,5 +1,5 @@
 {
- "build": "60b2bcb-20261016-dirty",
+ "build": "b898477-20261017",
  "cards": [
   {
    "classes": [
@@ -1738,6 +1738,7 @@
    "mp_gain": 0.0,
    "name": "Slime",
    "name_en": "Slime",
+   "resist": 1.0,
    "skills": [
     16.0
    ],
@@ -1752,6 +1753,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -1804,6 +1806,7 @@
    "mp_gain": 0.0,
    "name": "Dire Wolf",
    "name_en": "Dire Wolf",
+   "resist": 0.0,
    "skills": [
     18.0
    ],
@@ -1818,6 +1821,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -1870,6 +1874,7 @@
    "mp_gain": 1.0,
    "name": "Ghost Sword",
    "name_en": "Ghost Sword",
+   "resist": 1.0,
    "skills": [
     21.0
    ],
@@ -1884,6 +1889,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   },
   {
@@ -1955,6 +1961,7 @@
    "mp_gain": 0.0,
    "name": "Spider",
    "name_en": "Spider",
+   "resist": 0.0,
    "skills": [
     15.0
    ],
@@ -1969,6 +1976,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2026,6 +2034,7 @@
    "mp_gain": 2.0,
    "name": "Mad Whisp",
    "name_en": "Mad Whisp",
+   "resist": 2.0,
    "skills": [
     20.0,
     29.0
@@ -2041,6 +2050,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   },
   {
@@ -2112,6 +2122,7 @@
    "mp_gain": 0.0,
    "name": "Snake",
    "name_en": "Snake",
+   "resist": 0.0,
    "skills": [
     17.0
    ],
@@ -2126,6 +2137,7 @@
    },
    "threat_rank": 1.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -2192,6 +2204,7 @@
    "mp_gain": 1.0,
    "name": "Killer Plant",
    "name_en": "Killer Plant",
+   "resist": 1.0,
    "skills": [
     19.0,
     28.0
@@ -2207,6 +2220,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2264,6 +2278,7 @@
    "mp_gain": 2.0,
    "name": "Stranger",
    "name_en": "Stranger",
+   "resist": 2.0,
    "skills": [
     22.0
    ],
@@ -2278,6 +2293,7 @@
    },
    "threat_rank": 2.0,
    "traits": [],
+   "weak": 1.0,
    "weapon_id": 0.0
   },
   {
@@ -2401,6 +2417,7 @@
    "mp_gain": 2.0,
    "name": "Palehorn",
    "name_en": "Palehorn",
+   "resist": -1.0,
    "skills": [
     23.0,
     30.0
@@ -2416,6 +2433,7 @@
    },
    "threat_rank": 3.0,
    "traits": [],
+   "weak": 2.0,
    "weapon_id": 0.0
   },
   {
@@ -2558,6 +2576,7 @@
    "mp_gain": 3.0,
    "name": "Pale Choirbeast",
    "name_en": "Pale Choirbeast",
+   "resist": -1.0,
    "skills": [
     25.0,
     26.0,
@@ -2574,6 +2593,7 @@
    },
    "threat_rank": 4.0,
    "traits": [],
+   "weak": 0.0,
    "weapon_id": 0.0
   }
  ],
@@ -5665,8 +5685,7 @@
    }
   },
   {
-   "consume_on_hit": true,
-   "duration": 2.0,
+   "duration": 1.0,
    "guard_mult": 0.5,
    "id": 14.0,
    "name": "Braced",
@@ -5684,7 +5703,7 @@
     "mp_max": 0.0,
     "mp_min": 0.0
    },
-   "tick_on_enemy_turn": true
+   "until_player_turn": true
   }
  ],
  "version": 1.0

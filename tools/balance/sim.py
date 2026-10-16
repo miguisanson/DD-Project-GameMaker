@@ -47,6 +47,7 @@ ENEMY_IDS = {"slime": 0, "dire_wolf": 1, "ghost_sword": 2, "spider": 3, "mad_whi
 ENEMY_NAMES = {v: k for k, v in ENEMY_IDS.items()}
 # status ids (scr_macros)
 POISON, BLEED, BURN, STUN, GUARD, DMG_UP, EVASION, CRIT_UP, HIT_UP, MEDITATION, SOLIDIFY, BLOODTHIRSTY, BLESSING, SUNDER = range(14)
+BRACED = 14   # STATUS_BRACE: the Guard command (D99, D180): every hit deals half until the player's next turn starts (export: guard_mult 0.5, until_player_turn)
 # skill ids (scr_macros)
 SK_REGROW, SK_SNUFF, SK_STEAL = 28, 29, 22
 STATS = ("atk", "def", "spd", "mag")
@@ -56,6 +57,9 @@ WP_TURN_BONUS = 1     # a weak enemy: +1 Burning turn
 WP_STACK_BONUS = 1    # +1 Poison / Bleeding stack, never past the status table's max_stacks
 WP_BURN_TURN_CAP = 4  # the weakness never takes Burning past 4 turns
 WP_RESIST_MULT = 0.5  # a resisting enemy: the chance times this, rounded down to a whole percent (a sure 100% -> 50%)
+# D180: the Guard command gives back max(GUARD_MP_MIN, floor(GUARD_MP_PCT x max MP)) MP, never above max MP (GUARD_MP_PCT / GUARD_MP_MIN in scr_macros; the export has no field for them)
+GUARD_MP_PCT = 0.25
+GUARD_MP_MIN = 2
 BEDS_HEAL_FRAC = 1.0   # C4 (D47): a bed heals all HP and MP (scr_levelup Bed_Heal on branch c4-rest)
 # H4 (D143): the level's free point may go to Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN) instead of the class stat (scr_macros). what-if knobs:
 # constants.free_point_choices=0 plays the old way (always the class stat), constants.free_point_hp_gain / free_point_mp_gain change the amounts.
@@ -440,6 +444,8 @@ class Rules:
                 s["fresh"] = False
                 continue
             cfg = self.sdb[s["id"]]
+            if cfg.get("until_player_turn"):   # D180: Braced is not counted down by the owner's own turns; it ends in expire_at_player_turn
+                continue
             self.status_hp_tick(f, s, acted)
             t = cfg.get("tick", {})
             lo, hi = t.get("mp_min", 0), t.get("mp_max", 0)
@@ -454,6 +460,16 @@ class Rules:
                 s["turns"] -= 1
                 if s["turns"] <= 0:
                     f.status.remove(s)
+
+    def enemy_turn_done(self, f):
+        """Status_TickEnemyTurn: the enemy has had its turn, so a status that lasts until the player's next turn (Braced) may now end."""
+        for s in f.status:
+            if self.sdb[s["id"]].get("until_player_turn"):
+                s["enemy_done"] = True
+
+    def expire_at_player_turn(self, f):
+        """Status_ExpireAtPlayerTurn: a player turn starts; Braced ends once the enemy has had a turn since it was applied (a fast player who guards and is up again first keeps it)."""
+        f.status = [s for s in f.status if not (self.sdb[s["id"]].get("until_player_turn") and s.get("enemy_done"))]
 
     # ---- stats ----
     def equip_bonus(self, f, k):
@@ -1237,9 +1253,26 @@ class Battle:
             break
         e.ai["turns"] += 1
         R.tick(e, self.rng, True)
+        R.enemy_turn_done(p)
+
+    def guard_mp_gain(self):
+        """Battle_GuardMpGain: max(2, floor(25% max MP)), at most what fits under max MP."""
+        p = self.p
+        want = max(GUARD_MP_MIN, int(math.floor(p.mmp * GUARD_MP_PCT + 1e-9)))
+        return max(0, min(want, p.mmp - p.mp))
+
+    def p_guard(self):
+        """The Guard command (D99, D180): the turn is spent, every hit until the player's next turn deals half, and a quarter of max MP comes back."""
+        p = self.p
+        gain = self.guard_mp_gain()
+        self.R.status_add(p, BRACED, 1, 0)
+        p.mp += gain
+        self.count("guard")
+        self.log["guards"] = self.log.get("guards", 0) + 1
 
     def player_turn_start(self):
         R, p = self.R, self.p
+        R.expire_at_player_turn(p)
         self.p_turn_counter += 1
         self.rt["once_turn"] = False
         if self.rt["brace_cd"] > 0:
@@ -1291,8 +1324,11 @@ class Battle:
             self.p_throw(act[1])
         elif kind == "item":
             self.p_item(act[1])
+        elif kind == "guard":
+            self.p_guard()
         else:
             self.p_basic()
+        self.rt["guarded_last"] = (kind == "guard")
         if e.hp <= 0:
             return
         R.tick(p, self.rng, True)
@@ -1514,8 +1550,15 @@ class Policy:
                     n = min(9, remaining)
                     score = 0.25 * basic * max(0.0, n - 1)
                 elif sid2 == MEDITATION and not st_has(p, MEDITATION):
+                    # R-118 (forced pick, D174): Meditation is worth the MP that FITS under max MP, not 3 MP a turn for n turns. With a full bar it is a wasted turn (the old rule cast it
+                    # at the start of every fight and cost the Mage about 40 points of win rate). The fight itself spends MP too: its casts make room for the regeneration.
                     n = min(9, remaining)
-                    score = 3.0 * n * self.mp_price_of(b) * basic
+                    tk = R.sdb[MEDITATION].get("tick", {})
+                    per_turn = (tk.get("mp_min", 0) + tk.get("mp_max", 0)) / 2.0 or 3.0
+                    dmg_costs = [R.player_skill(p, x)["mp_cost"] for x in p.skills if R.skills[x]["effect"] == "damage"]
+                    spend = (sum(dmg_costs) / len(dmg_costs)) * max(0.0, n - 1) * 0.6 if dmg_costs else 0.0
+                    usable = min(per_turn * n, max(0.0, (p.mmp - p.mp) + spend))
+                    score = usable * self.mp_price_of(b) * basic
                 elif sid2 == HIT_UP and not st_has(p, HIT_UP):
                     pr2 = b.grade_probs(b.p_widen() * 1.5)
                     gain = exp_damage(ref.power_basic(wp), R.eff(p, stat), d_e, mult, pr2, grades, crit_p) - basic
@@ -1540,6 +1583,25 @@ class Policy:
         if e.ai["windup"] >= 0:
             return self.enemy_skill_dmg(b, e.ai["windup"])
         return self.enemy_dpa(b)
+
+    def guard_wanted(self, b, diff, basic, danger):
+        """R-118 (D180): when the simple 'average player' presses Guard (halves every hit until his next turn, gives back max(2, 25% max MP)). Never twice in a row, never into a fight that
+        one more attack ends. Reasons, first that holds wins:
+          1. the enemy is winding up (telegraphed) a hit that would take a quarter of his max HP or more: halve it;
+          2. a caster (it owns skills) in a fight that is not easy cannot pay for its cheapest skill, has no MP potion, is above half HP, and the MP Guard gives back would pay for it;
+          3. a hit that could kill him is coming, there is no potion to drink (the heal rule came first), and half of it he survives."""
+        p, e = b.p, b.e
+        if st_has(p, BRACED) or b.rt.get("guarded_last") or e.hp <= basic:
+            return False
+        if e.ai["windup"] >= 0 and self.next_hit(b) >= 0.25 * p.mhp:
+            return True
+        if p.skills and diff != "easy" and p.hp >= 0.5 * p.mhp:
+            cheapest = min(self.R.player_skill(p, s)["mp_cost"] for s in p.skills)
+            if p.mp < cheapest and p.mp + b.guard_mp_gain() >= cheapest:
+                return True
+        if p.hp <= danger * 1.15 and p.hp > 0.5 * danger * 1.15:
+            return True
+        return False
 
     def choose(self, b):
         R, p, e = self.R, b.p, b.e
@@ -1566,6 +1628,8 @@ class Policy:
         thr = self.pick_throw(b, diff)
         opts = self.attack_options(b)
         ctx = self.last_ctx
+        if self.guard_wanted(b, diff, ctx["basic"], danger):
+            return ("guard",)
         if thr is not None:
             return ("throw", thr)
         # 4. skills
