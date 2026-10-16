@@ -549,7 +549,11 @@ function Scenario_StepSmoke(_s) {
             Scenario_StepSmokeR3Menus(_s);   // round 3 menus (R-096, R-097): Controls > Reset to Defaults asks, No and Esc change nothing, Yes resets and a notice says so, the changed row flashes; goes on with r3light (1000)
             break;
         case 1000: case 1001: case 1002: case 1003: case 1004: case 1005: case 1006: case 1007: case 1008: case 1009:
-            Scenario_StepSmokeR3Light(_s);   // r3light: the player's layer over a walk and a run, the same picture plain and squashed, the merchant's cell; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeR3Light(_s);   // r3light: the player's layer over a walk and a run, the same picture plain and squashed, the merchant's cell; goes on with saves2 (1070)
+            break;
+        case 1070: case 1071: case 1072: case 1073: case 1074: case 1075: case 1076: case 1077: case 1078: case 1079:
+        case 1080: case 1081: case 1082: case 1083: case 1084: case 1085: case 1086: case 1087: case 1088: case 1089:
+            Scenario_StepSmokeR3Saves2(_s);   // saves2 (D175, R-107): the title with profiles and three save files through real keys; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -14340,7 +14344,207 @@ function Scenario_StepSmokeR3Light(_s) {
             }
             if (_s.t > 900) { Scenario_Check("r3light_a_merchant_floor_is_reached", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
             break;
-        case 1004:   // the end of the chain: removes the files and the profile the steps made
+        case 1004:   // goes on with saves2 (1070..1089), the end of the chain
+            Scenario_Next(_s, 1070);
+            break;
+    }
+}
+
+// ============================================================================
+// Round 3, packet saves2 (D175, R-107), smoke steps 1070..1089: the title with profiles and three save files, through the real title and real keys. They go on from r3light (1004).
+// 1070..1079 (save files): a fresh profile (nothing saved: Continue and Load Game are grey, the cursor is on New Game), New Game starts in save 1 and the intro plays; back on
+// the title Continue is on and has the cursor, New Game starts in save 2 and the intro does NOT play again; Load Game lists save 1 and 2 (3 greyed), the delete key asks, Yes
+// deletes save 2; Continue loads save 1. The last step calls Scenario_NoticeEnd.
+// ============================================================================
+function Scenario_ProfilesWipe() {
+    Save_DeleteFileSet(Profiles_IndexPath());
+    if (file_exists(Profiles_IndexPath() + ".corrupt")) file_delete(Profiles_IndexPath() + ".corrupt");
+    for (var _i = 0; _i < PROFILES_MAX; _i++) {
+        Save_DeleteFileSet(Profiles_PathOf(_i));
+        for (var _s = 0; _s < PROFILE_SLOTS; _s++) {
+            var _rp = Slots_PathOf(_i, _s);
+            Save_DeleteFileSet(_rp);
+            var _kf = RunSave_KeptFiles(_rp);
+            for (var _k = 0; _k < array_length(_kf); _k++) Save_DeleteFileSet(_kf[_k]);
+        }
+    }
+    global.profiles_index = undefined;
+    global.profile = undefined;
+    global.profile_status = "missing";
+    global.save_slot_active = 0;
+}
+
+function Scenario_StepSmokeR3Saves2(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _top = (_sc != noone && is_struct(_sc.title_stk)) ? Ui_StackTop(_sc.title_stk) : undefined;
+    if (!variable_struct_exists(_s, "r3s2")) _s.r3s2 = { intro: false };
+    var _d = _s.r3s2;
+    if (room == rm_start && _sc != noone && _sc.state == "boot_logo") _sc.state = "main";   // the logo is not what is checked here
+    var _title_ready = (room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_top) && !Transition_IsActive() && !Notice_IsOpen() && !Confirm_IsOpen());
+    if (room == rm_cutscene) _d.intro = true;   // set whenever the intro cutscene room was seen since the flag was last cleared
+    switch (_s.step) {
+        case 1070:   // a fresh profile, then the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP saves2 smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_NoticeEnd();
+                    break;
+                }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Scenario_ProfilesWipe();
+                Scenario_NoticeToTitle();
+            }
+            if (_s.t > 20 && _title_ready) Scenario_Next(_s, 1071);
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_reaches_the_title", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1071:   // nothing saved: Continue and Load Game are grey, the cursor is on New Game
+            if (_s.t == 1) {
+                var _ids = "";
+                for (var _i = 0; _i < array_length(_top.items); _i++) _ids += ((_i > 0) ? "," : "") + _top.items[_i].id;
+                Scenario_Check("saves2_smoke_the_title_rows", _ids == "continue,new,load,settings,exit", _ids);
+                Scenario_Check("saves2_smoke_continue_is_grey_with_nothing_saved", !_top.items[0].enabled);
+                Scenario_Check("saves2_smoke_load_game_is_grey_with_nothing_saved", !_top.items[2].enabled);
+                Scenario_Check("saves2_smoke_the_cursor_starts_on_new_game", _top.cursor == 1, "cursor=" + string(_top.cursor));
+                Scenario_Check("saves2_smoke_a_fresh_profile_has_not_seen_the_intro", !Story_Seen(Story_CutsceneKey("intro")));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") Scenario_Next(_s, 1072);
+            if (_s.t > 300) { Scenario_Check("saves2_smoke_new_game_opens_the_seed_pick", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1072:   // Random seed: the intro plays, in save 1
+            Scenario_SeedPickRandom(_s);
+            if (room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                Scenario_Check("saves2_smoke_a_fresh_profile_plays_the_intro", _d.intro);
+                Scenario_Check("saves2_smoke_new_game_uses_save_1", Slot_Active() == 0, "slot=" + string(Slot_Active()));
+                Scenario_Hold("confirm", 150);   // D48: hold to skip the intro
+                Scenario_Next(_s, 1073);
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_the_intro_starts", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1073:   // the run is up in save 1; its file is written; back to the title
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Release();
+                _d.seed0 = Run_Get().seed;
+                Scenario_Check("saves2_smoke_the_run_is_in_save_1", Slot_Active() == 0);
+                Scenario_Check("saves2_smoke_the_intro_is_marked_seen", Story_Seen(Story_CutsceneKey("intro")));
+                Run_AutoSave();
+                Scenario_Check("saves2_smoke_save_1_is_written", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _d.intro = false;
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1074);
+            }
+            if (_s.t > 1500) { Scenario_Check("saves2_smoke_the_first_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1074:   // Continue is on and has the cursor; Down to New Game; the second New Game uses save 2 and no intro
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t74")) {
+                    _d.t74 = _s.t;
+                    Scenario_Check("saves2_smoke_continue_is_on_with_a_save", _top.items[0].enabled);
+                    Scenario_Check("saves2_smoke_the_cursor_starts_on_continue", _top.cursor == 0, "cursor=" + string(_top.cursor));
+                    Scenario_Check("saves2_smoke_load_game_is_on_with_a_save", _top.items[2].enabled);
+                    Scenario_Check("saves2_smoke_the_continue_card_is_shown", _sc.title_card.kind == "run", string(_sc.title_card.kind));
+                    Scenario_Tap("menu_down");
+                }
+                if (_s.t == _d.t74 + 8) {
+                    Scenario_Check("saves2_smoke_down_reaches_new_game", _top.cursor == 1 && _top.items[1].id == "new", "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+                if (_s.t > _d.t74 + 14 && _top.id == "seed_choice") {
+                    Scenario_Check("saves2_smoke_a_used_save_1_asks_no_question", !Confirm_IsOpen());
+                    Scenario_Next(_s, 1075);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_the_second_new_game_opens_the_seed_pick", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1075:   // Random seed: straight to the floor, no intro, in save 2
+            Scenario_SeedPickRandom(_s);
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("saves2_smoke_the_intro_does_not_play_again", !_d.intro);
+                Scenario_Check("saves2_smoke_new_game_uses_save_2", Slot_Active() == 1, "slot=" + string(Slot_Active()));
+                Scenario_Check("saves2_smoke_save_1_is_untouched", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                Run_AutoSave();
+                Scenario_Check("saves2_smoke_save_2_is_written", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1076);
+            }
+            if (_s.t > 1500) { Scenario_Check("saves2_smoke_the_second_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1076:   // Load Game: save 1 and 2 are listed, 3 is greyed
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t76")) {
+                    _d.t76 = _s.t;
+                    Ui_MenuFixCursor(_top, 2);
+                    Scenario_Check("saves2_smoke_the_cursor_is_on_load_game", _top.items[_top.cursor].id == "load", "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+                if (_s.t > _d.t76 + 8 && _top.id == "slots_load") {
+                    Scenario_Check("saves2_smoke_load_game_lists_three_files", array_length(_top.items) == 3);
+                    Scenario_Check("saves2_smoke_saves_1_and_2_are_listed_save_3_is_greyed", _top.items[0].enabled && _top.items[1].enabled && !_top.items[2].enabled && _top.items[2].value == Loc_T("save.slot.empty", "Empty"));
+                    Scenario_Check("saves2_smoke_the_title_menu_is_below_the_picker", Ui_StackDepth(_sc.title_stk) == 2);
+                    Scenario_Tap("menu_down");
+                    Scenario_Next(_s, 1077);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_load_game_opens_the_picker", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1077:   // the cursor on save 2, the delete key (Q) asks, No keeps it, then Yes deletes it
+            switch (_s.t) {
+                case 10:
+                    Scenario_Check("saves2_smoke_down_moves_to_save_2", _top.id == "slots_load" && _top.cursor == 1, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 20:
+                    Scenario_Check("saves2_smoke_the_delete_key_asks", Confirm_IsOpen() && Confirm_Question() == "Delete Save 2? The run in it will be lost.", Confirm_IsOpen() ? Confirm_Question() : "none");
+                    Scenario_Check("saves2_smoke_the_question_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                    Scenario_Tap("confirm");   // No
+                    break;
+                case 30:
+                    Scenario_Check("saves2_smoke_no_keeps_save_2", !Confirm_IsOpen() && RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 40:
+                    Scenario_Check("saves2_smoke_it_asks_again", Confirm_IsOpen());
+                    Scenario_Tap("menu_up");   // Yes
+                    break;
+                case 46:
+                    Scenario_Tap("confirm");
+                    break;
+                case 56:
+                    Scenario_Check("saves2_smoke_yes_deletes_save_2", !RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                    Scenario_Check("saves2_smoke_the_picker_shows_save_2_empty", _top.id == "slots_load" && _top.items[1].value == Loc_T("save.slot.empty", "Empty") && !_top.items[1].enabled);
+                    Scenario_Check("saves2_smoke_save_1_is_still_there", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                    Scenario_Check("saves2_smoke_continue_targets_save_1_now", Slots_ContinueTarget() == 0, "target=" + string(Slots_ContinueTarget()));
+                    Scenario_Tap("cancel");
+                    Scenario_Next(_s, 1078);
+                    break;
+            }
+            break;
+        case 1078:   // back on the title (Continue on), Continue loads save 1
+            if (_s.t == 12) {
+                Scenario_Check("saves2_smoke_back_leaves_the_picker", _top.id == "title" && Ui_StackDepth(_sc.title_stk) == 1, "top=" + string(_top.id));
+                Ui_MenuFixCursor(_top, 0);
+                Scenario_Check("saves2_smoke_continue_is_still_on", _top.items[0].enabled && _top.cursor == 0);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("saves2_smoke_continue_loads_save_1", Run_Get().seed == _d.seed0, "seed=" + string(Run_Get().seed) + " want " + string(_d.seed0));
+                Scenario_Check("saves2_smoke_continue_makes_save_1_the_active_file", Slot_Active() == 0);
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1079);
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_continue_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1079:   // the end of the chain: removes the profiles and files the steps made
+            Scenario_ProfilesWipe();
             Scenario_NoticeEnd();
             break;
     }

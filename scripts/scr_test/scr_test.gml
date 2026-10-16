@@ -155,6 +155,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Light", Test_Suite_R3Light);
     Test_RunSuite("R3Bvis", Test_Suite_R3Bvis);
     Test_RunSuite("Profiles", Test_Suite_Profiles);
+    Test_RunSuite("R3Saves2", Test_Suite_R3Saves2);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -15478,4 +15479,211 @@ function Test_ProfRunSummary() {
     Test_Eq("run summary: the file says version 3", _raw.run_version, 3);
     _gs.checkpoint = _old_cp;
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ============================================================================================================
+// Packet saves2 (D175): the title with profiles and three save files. Part 1: the title model (Continue / New Game / Load Game follow the active profile's save files) and the
+// Load Game / overwrite picker. Every test runs in the saves1 sandbox (Test_ProfRun). Expected values come from the packet brief and D175, not from the code.
+// ============================================================================================================
+function Test_Suite_R3Saves2() {
+    Test_RunSuite("R3Saves2.items", Test_R3s2ItemsRun);
+    Test_RunSuite("R3Saves2.state", Test_R3s2StateRun);
+    Test_RunSuite("R3Saves2.rows", Test_R3s2RowsRun);
+    Test_RunSuite("R3Saves2.newgame", Test_R3s2NewGameRun);
+    Test_RunSuite("R3Saves2.overwrite", Test_R3s2OverwriteRun);
+    Test_RunSuite("R3Saves2.delete", Test_R3s2DeleteRun);
+}
+
+function Test_R3s2ItemsRun() { Test_ProfRun("tq1_", Test_R3s2Items); }
+function Test_R3s2StateRun() { Test_ProfRun("tq2_", Test_R3s2State); }
+function Test_R3s2RowsRun() { Test_ProfRun("tq3_", Test_R3s2Rows); }
+function Test_R3s2NewGameRun() { Test_ProfRun("tq4_", Test_R3s2NewGame); }
+function Test_R3s2OverwriteRun() { Test_ProfRun("tq5_", Test_R3s2Overwrite); }
+function Test_R3s2DeleteRun() { Test_ProfRun("tq6_", Test_R3s2Delete); }
+
+function Test_R3s2Ids(_items) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_items); _i++) _out += ((_i > 0) ? "," : "") + _items[_i].id;
+    return _out;
+}
+
+function Test_R3s2Enabled(_items) {
+    var _out = "";
+    for (var _i = 0; _i < array_length(_items); _i++) _out += _items[_i].enabled ? "1" : "0";
+    return _out;
+}
+
+// A fake title controller with the title menu on its stack: only what New Game / Load Game need.
+function Test_R3s2Title() {
+    var _c = { title_exit: undefined, title_stk: Ui_StackNew(), title_seed: undefined };
+    var _m = Ui_MenuNew("test_r3s2_title", Title_MainItems(false, false), { owner: _c });
+    Ui_StackPush(_c.title_stk, _m);
+    return _c;
+}
+
+function Test_R3s2Items(_p) {
+    var _a = Title_MainItems(false, false);
+    Test_Eq("saves2 items: the rows in order (D175: Continue, New Game, Load Game, Settings, Quit)", Test_R3s2Ids(_a), "continue,new,load,settings,exit");
+    Test_Eq("saves2 items: Continue reads Continue", _a[0].label, "Continue");
+    Test_Eq("saves2 items: New Game reads New Game", _a[1].label, "New Game");
+    Test_Eq("saves2 items: Load Game reads Load Game", _a[2].label, "Load Game");
+    Test_Eq("saves2 items: no save file: only New Game, Settings and Quit are on", Test_R3s2Enabled(_a), "01011");
+    Test_Eq("saves2 items: a Continue target turns Continue on", Test_R3s2Enabled(Title_MainItems(true, false)), "11011");
+    Test_Eq("saves2 items: a save file turns Load Game on", Test_R3s2Enabled(Title_MainItems(false, true)), "01111");
+    Test_Eq("saves2 items: both on", Test_R3s2Enabled(Title_MainItems(true, true)), "11111");
+    Test_Eq("saves2 items: New Game with an empty save file starts in it", Title_NewPlan(2).kind, "start");
+    Test_Eq("saves2 items: and says which one", Title_NewPlan(2).slot, 2);
+    Test_Eq("saves2 items: New Game with no empty save file asks which to overwrite", Title_NewPlan(-1).kind, "overwrite");
+    Test_Eq("saves2 items: the save file names", Title_SlotName(0) + "|" + Title_SlotName(2), "Save 1|Save 3");
+    Test_Eq("saves2 items: the last-saved stamp", Title_FormatSaved(date_create_datetime(2026, 10, 16, 14, 5, 0)), "2026-10-16 14:05");
+    Test_Eq("saves2 items: an unknown stamp is a dash", Title_FormatSaved(-1), "-");
+}
+
+function Test_R3s2State(_p) {
+    var _st = Title_State();
+    Test_Eq("saves2 state: a fresh profile has no Continue target", _st.cont, -1);
+    Test_Eq("saves2 state: its first empty save file is the first one", _st.first_empty, 0);
+    Test_False("saves2 state: and nothing to load", _st.any);
+    Test_Eq("saves2 state: Title_State lists the three save files", array_length(_st.slots), 3);
+    Test_ProfPutRun(_p + "run_0_1.sav", 3, 11, CLASS_KNIGHT, 3, 2, 9000, 40);
+    _st = Title_State();
+    Test_Eq("saves2 state: the only save file is the Continue target", _st.cont, 1);
+    Test_Eq("saves2 state: the first empty one is still save 1", _st.first_empty, 0);
+    Test_True("saves2 state: there is something to load", _st.any);
+    Test_Eq("saves2 state: the items follow", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "11111");
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 12, CLASS_MAGE, 1, 1, 1000, 30);
+    Test_ProfPutRun(_p + "run_0_2.sav", 3, 13, CLASS_ARCHER, 2, 1, 1000, 20);
+    _st = Title_State();
+    Test_Eq("saves2 state: all three used: no empty save file", _st.first_empty, -1);
+    Test_Eq("saves2 state: so New Game asks which to overwrite", Title_NewPlan(_st.first_empty).kind, "overwrite");
+    // Continue and Load Game follow the ACTIVE profile (R-107)
+    var _b = Profiles_Create("Bea");
+    Test_True("saves2 state: a second profile switches in", Profiles_Switch(_b));
+    _st = Title_State();
+    Test_Eq("saves2 state: the new profile has nothing to continue", _st.cont, -1);
+    Test_False("saves2 state: nor to load", _st.any);
+    Test_Eq("saves2 state: its first empty save file is its first", _st.first_empty, 0);
+    Test_Eq("saves2 state: the items go grey again", Test_R3s2Enabled(Title_MainItems(_st.cont >= 0, _st.any)), "01011");
+    Test_True("saves2 state: back to the first profile", Profiles_Switch(0));
+    _st = Title_State();
+    Test_True("saves2 state: its save files are back", _st.any && _st.first_empty == -1);
+    Test_Eq("saves2 state: Title_State(pid) reads any profile", Title_State(_b).any, false);
+}
+
+function Test_R3s2Rows(_p) {
+    var _t = date_create_datetime(2026, 10, 16, 14, 5, 0);
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 21, CLASS_KNIGHT, 3, 2, 9000, _t);
+    Test_ProfPutRun(_p + "run_0_1.sav", 4, 22, CLASS_MAGE, 3, 2, 9000, _t);   // a version this build does not know: "newer"
+    var _rows = Title_SlotRows(Slots_Summary(0), "load");
+    Test_Eq("saves2 rows: one row per save file", array_length(_rows), 3);
+    Test_Eq("saves2 rows: the first label", _rows[0].label, "Save 1");
+    Test_Eq("saves2 rows: a good save shows class and level", _rows[0].value, "Knight Lv 3");
+    Test_True("saves2 rows: and can be picked", _rows[0].enabled);
+    Test_Eq("saves2 rows: its floor line", Test_RowValue(_rows[0].lines, "Floor"), "2");
+    Test_Eq("saves2 rows: its run time line", Test_RowValue(_rows[0].lines, "Time"), "0:09");
+    Test_Eq("saves2 rows: its last saved line", Test_RowValue(_rows[0].lines, "Last Saved"), "2026-10-16 14:05");
+    Test_Eq("saves2 rows: a newer file says it cannot be loaded", _rows[1].value, "Cannot load");
+    Test_True("saves2 rows: but it can be selected (to delete it)", _rows[1].enabled);
+    Test_Eq("saves2 rows: and says why in its details", _rows[1].help, "This run was saved by a newer version of the game and cannot be loaded.");
+    Test_Eq("saves2 rows: an empty save file reads Empty", _rows[2].value, "Empty");
+    Test_False("saves2 rows: and is greyed in Load Game", _rows[2].enabled);
+    Test_Eq("saves2 rows: ids", Test_R3s2Ids(_rows), "slot_0,slot_1,slot_2");
+    var _over = Title_SlotRows(Slots_Summary(0), "overwrite");
+    Test_True("saves2 rows: in the overwrite picker an empty file is a row too", _over[2].enabled);
+    Test_Eq("saves2 rows: slot numbers are kept", _rows[1].slot, 1);
+    Test_RawWrite(_p + "run_0_2.sav", "{{ not json");
+    var _bad = Title_SlotRows(Slots_Summary(0), "load");
+    Test_Eq("saves2 rows: a damaged file cannot be loaded", _bad[2].value, "Cannot load");
+}
+
+function Test_R3s2NewGame(_p) {
+    Test_ConfirmReset();
+    var _c = Test_R3s2Title();
+    var _m = _c.title_stk.menus[0];
+    Title_NewPress(_c, _m);
+    Test_False("saves2 new game: an empty save file asks nothing", Confirm_IsOpen());
+    Test_Eq("saves2 new game: it goes on to the seed pick", Ui_StackTop(_c.title_stk).id, "seed_choice");
+    Test_False("saves2 new game: and starts nothing before the pick", is_struct(_c.title_exit));
+    Title_SeedChoiceConfirm(Ui_StackTop(_c.title_stk), 0);
+    Test_True("saves2 new game: the pick starts it", is_struct(_c.title_exit));
+    Test_Eq("saves2 new game: in save 1", Slot_Active(), 0);
+    global.run_next_seed = undefined;
+    // save 1 is used: the next New Game takes save 2 without asking
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 31, CLASS_KNIGHT, 2, 1, 1000, 5);
+    var _c2 = Test_R3s2Title();
+    Title_NewPress(_c2, _c2.title_stk.menus[0]);
+    Test_False("saves2 new game: save 1 used: still no question", Confirm_IsOpen());
+    Title_SeedChoiceConfirm(Ui_StackTop(_c2.title_stk), 0);
+    Test_Eq("saves2 new game: the first EMPTY save file is used", Slot_Active(), 1);
+    Test_True("saves2 new game: save 1 is untouched", RunSave_ExistsAt(_p + "run_0_0.sav"));
+    global.run_next_seed = undefined;
+}
+
+function Test_R3s2Overwrite(_p) {
+    Test_ConfirmReset();
+    for (var _s = 0; _s < 3; _s++) Test_ProfPutRun(_p + "run_0_" + string(_s) + ".sav", 3, 40 + _s, CLASS_KNIGHT, 2 + _s, 1, 1000, 10 + _s);
+    var _c = Test_R3s2Title();
+    Title_NewPress(_c, _c.title_stk.menus[0]);
+    var _top = Ui_StackTop(_c.title_stk);
+    Test_Eq("saves2 overwrite: all three used: the picker opens", _top.id, "slots_overwrite");
+    Test_Eq("saves2 overwrite: it is titled as the question", _top.layout.title, "Overwrite which save file?");
+    Test_Eq("saves2 overwrite: three rows, all pickable", Test_R3s2Enabled(_top.items), "111");
+    Test_False("saves2 overwrite: nothing is asked yet", Confirm_IsOpen());
+    Ui_MenuFixCursor(_top, 1);
+    _top.on_confirm(_top, 1);
+    Test_True("saves2 overwrite: picking a file asks Yes / No", Confirm_IsOpen());
+    Test_Eq("saves2 overwrite: the question names the file", Confirm_Question(), "Overwrite Save 2? The run in it will be lost.");
+    Test_Eq("saves2 overwrite: it starts on No", Confirm_Menu().cursor, 1);
+    Confirm_Back();
+    Test_True("saves2 overwrite: No keeps the file", RunSave_ExistsAt(_p + "run_0_1.sav"));
+    Test_Eq("saves2 overwrite: and the picker stays", Ui_StackTop(_c.title_stk).id, "slots_overwrite");
+    _top.on_confirm(_top, 1);
+    Test_True("saves2 overwrite: Yes is answered", Test_ConfirmSayYes());
+    Test_Eq("saves2 overwrite: Yes opens the seed pick", Ui_StackTop(_c.title_stk).id, "seed_choice");
+    Test_True("saves2 overwrite: the file is not deleted before the run is really started", RunSave_ExistsAt(_p + "run_0_1.sav"));
+    Test_False("saves2 overwrite: nothing started yet", is_struct(_c.title_exit));
+    Title_SeedChoiceConfirm(Ui_StackTop(_c.title_stk), 0);
+    Test_True("saves2 overwrite: the pick starts the run", is_struct(_c.title_exit));
+    Test_Eq("saves2 overwrite: in the chosen file", Slot_Active(), 1);
+    Test_False("saves2 overwrite: the old run in it is gone", RunSave_ExistsAt(_p + "run_0_1.sav"));
+    Test_True("saves2 overwrite: the other files are untouched", RunSave_ExistsAt(_p + "run_0_0.sav") && RunSave_ExistsAt(_p + "run_0_2.sav"));
+    var _h = Profile_Get().history;
+    Test_Eq("saves2 overwrite: the lost run is in the history", array_length(_h), 1);
+    if (array_length(_h) == 1) Test_Eq("saves2 overwrite: as abandoned", _h[0].result, "abandoned");
+    global.run_next_seed = undefined;
+}
+
+function Test_R3s2Delete(_p) {
+    Test_ConfirmReset();
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 51, CLASS_KNIGHT, 2, 1, 1000, 10);
+    Test_ProfPutRun(_p + "run_0_1.sav", 3, 52, CLASS_MAGE, 3, 2, 2000, 20);
+    var _c = Test_R3s2Title();
+    var _m = Title_PickerOpen(_c, "load");
+    Test_Eq("saves2 delete: Load Game opens a picker", Ui_StackTop(_c.title_stk).id, "slots_load");
+    Test_Eq("saves2 delete: the empty file is greyed", Test_R3s2Enabled(_m.items), "110");
+    Test_Eq("saves2 delete: the cursor starts on the first file", _m.cursor, 0);
+    Ui_MenuFixCursor(_m, 1);
+    Title_PickerDeleteAsk(_c, _m);
+    Test_True("saves2 delete: the delete key asks Yes / No", Confirm_IsOpen());
+    Test_Eq("saves2 delete: it names the file", Confirm_Question(), "Delete Save 2? The run in it will be lost.");
+    Test_Eq("saves2 delete: it starts on No", Confirm_Menu().cursor, 1);
+    Confirm_Back();
+    Test_True("saves2 delete: No keeps the file", RunSave_ExistsAt(_p + "run_0_1.sav"));
+    Title_PickerDeleteAsk(_c, _m);
+    Test_True("saves2 delete: Yes is answered", Test_ConfirmSayYes());
+    Test_False("saves2 delete: the file is gone", RunSave_ExistsAt(_p + "run_0_1.sav"));
+    Test_Eq("saves2 delete: the picker shows it empty", _m.items[1].value, "Empty");
+    Test_False("saves2 delete: and greyed", _m.items[1].enabled);
+    Test_Eq("saves2 delete: the run counts as abandoned", array_length(Profile_Get().history), 1);
+    Test_Eq("saves2 delete: Continue falls back to the other file", Slots_ContinueTarget(), 0);
+    Test_Eq("saves2 delete: the cursor moved off the greyed row", _m.cursor, 0);
+    _m.cursor = 2;
+    Title_PickerDeleteAsk(_c, _m);
+    Test_False("saves2 delete: an empty file asks nothing", Confirm_IsOpen());
+    Ui_MenuFixCursor(_m, 0);
+    Title_PickerDeleteAsk(_c, _m);
+    Test_True("saves2 delete: the last file asks too", Confirm_IsOpen());
+    Test_ConfirmSayYes();
+    Test_Eq("saves2 delete: with no file left the picker goes back to the title", Ui_StackDepth(_c.title_stk), 1);
+    Test_False("saves2 delete: and Load Game has nothing", Title_State().any);
 }
