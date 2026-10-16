@@ -2,14 +2,12 @@
 Updated after every step that lands. The full build list is `.planning/BUILD-PLAN.md`; the design spec is `.planning/research/DECISIONS.md` (D1-D125).
 Build: fixing round-3 playtest notes on `next` (next playtest build after batch 2) | Release then stop (D28)
 
-## Now — FIXING YOUR ROUND-3 NOTES (29 items)
-- Your notes are logged (ISSUES I-077..I-105) and your answers are locked as D174-D183 (profiles + 3 save files, VIG/MND, gold growth rows, rarity colours, stealth package + faint cone, Guard + MP, stagger unchanged, Skip removed, ALL CAPS grades, mouse cursor without click-to-move).
-- Batch 1 building now: lighting flicker + merchant light, enemy shadows + snake position + buff blink, card Skip removal + card text fit, caps grades + Gear headers + reset pop-up.
-- Batch 2 next: profiles/save files, stealth, rarity, Guard, mouse, level-up screen, wolf dialogue, death titles.
-- Nothing waiting on you: I set the VIG/MND and idea numbers (D184/D185, Mage = glass cannon); you judge them in the playtest. After the fixes I go straight on to the ideas (weak points, trapped chests, boss finisher, death tip); branching upgrades waits for a quick Q&A. 
-- **Waiting on you (when back):** listen to the music/refuse-sound candidates in `artudio_candidates\PICK.md` (my picks: battle B2, boss K2, refuse R1), import your picks in GameMaker as the file says, then I wire them in.
-- Running 2 agents at a time (your cap); roughly 10-14 h for the fixes, then the ideas.
-- Already fixed on `next` (in the next build): the "Damag.."/"Perfec.." plate, the run summary labels.
+## Now — PLAYTEST NOW (build 8d176ba-20261017), then the final fixes and release
+- Play: `E:\Games\DD-Project Playtest\8d176ba-20261017\DD-Project.exe`. Your old save becomes Profile 1, save file 1 on first launch.
+- Checklist: `.planning/PLAYTEST-QUEUE.md`, section "Build 8d176ba-20261017" — 30 items + 3 questions. Send notes; they are the final fix round (D188).
+- In this build: all 29 round-3 notes, profiles + 3 save files, stealth + sight cone + bushes, rarity colours, mouse cursor, VIG/MND + new level-up screen, Guard + MP, weak points, death tips, trapped chests, boss finisher. Full gate PASS (unit, smoke, bot, 440 screenshots).
+- Not in this build yet: the sound loudness fix (agent working), the class-balance nudges (D186), your music picks (`artudio_candidates\PICK.md`).
+- Then: final fixes -> release v1.0 "NO HOPE" by PaleRook (zip + itch.io text, D188-D190).
 
 ## Done
 - Overnight 2026-10-15/16: fairer randomness (D117-D125), alt-tab pause, flee % and crit odds shown, difficulty list removed, New Game asks twice when a run is saved, optimisation pass (menus ~22x, items ~20x, battle HUD ~2.6x faster), ~1,400 lines of dead code removed, an extra Opus review (1 real bug fixed).
