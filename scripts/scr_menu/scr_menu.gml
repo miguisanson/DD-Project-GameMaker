@@ -2838,12 +2838,17 @@ function Hud_DrawCoin(_x, _y, _p) {
     Ui_Box(_x + 2 * _p, _y + 2 * _p, _x + 3 * _p, _y + 4 * _p, UI_C_LIGHTEST);
 }
 
+// R-109: when the gold box is drawn, by the screen state alone: only over the bare map (or a dialogue), never under a menu, a level-up or card screen (their panels cover the corner it stands in).
+function Hud_GoldShown(_mode, _room, _cutscene) {
+    if (_room == rm_start || _room == rm_cutscene) return false;
+    if (_mode != UI_NONE && _mode != UI_DIALOGUE) return false;
+    return !_cutscene;
+}
+
 function Hud_DrawGold() {
     if (!Run_IsActive()) return;
     var gs = GameState_Get();
-    if (room == rm_start || room == rm_cutscene) return;
-    if (gs.ui.mode != UI_NONE && gs.ui.mode != UI_DIALOGUE) return;
-    if (variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active) return;
+    if (!Hud_GoldShown(gs.ui.mode, room, variable_struct_exists(gs.ui, "cutscene_active") && gs.ui.cutscene_active)) return;
     if (room != rm_battle && (room_width < DISPLAY_BASE_W || room_height < DISPLAY_BASE_H)) return;   // a room smaller than the view is centred with black round it (DISP-10): nothing may be drawn there
     var mt = Ui_Metrics();
     var p = mt.p;
@@ -4144,7 +4149,10 @@ function Ui_ReadInput() {
 // Tab menu (D90) fields: y_top (the list's top edge), details_pos "right" (the details panel stands beside the list, det_w wide (0 = the rest of the
 // width), from det_top (default: the list's top) and det_h tall (default: as tall as the list)), det_art (the details panel starts with the item's or enemy's picture: item field pic { spr, sub } or icon_item).
 // G10 (D129): det_floor_y (for details_pos "above"; -1 = none) is the highest line the details panel may reach (the battle sets it to just below the enemy): when the panel
-// and the list would not fit under it, the list shows two rows, then the details drop the arrow strip, then the list shows one row.
+// and the list would not fit under it (R-108), in this order: the details drop every number line not marked keep: true (all but the first when none is marked); then the arrow strip;
+// then the list shows two rows, then one (the gap between the panels shrinks to one pixel unit); then the prompt line is left out (det_floor_alt is the floor without it; -1 = same as
+// det_floor_y); then the details' last-resort lines go (dup: true, the MP the list row shows; an item keeps none), then the sentence takes the next smaller type step, then the two panels
+// share a border and the details have one pixel unit of air inside instead of two. The sentence is never dropped.
 // Number lines may carry delta (-1 / 0 / +1): a small arrow shows before the value (a better or worse number).
 // After a draw m.rect and m.det_rect hold the panel and details rectangles.
 function Ui_MenuNew(_id, _items, _opts) {
@@ -4155,8 +4163,8 @@ function Ui_MenuNew(_id, _items, _opts) {
         owner: noone, data: {}, lock_ms: current_time,
         layout: { title: "", note: "", anchor: "center", y_frac: 0.5, center: false, details: false, hides_below: false,
                   x_anchor: "center", panel_w: 0, y_bottom: -1, max_h: 0, details_pos: "below", details_cols: 1, rows_max: 0,
-                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1 },
-        rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 },
+                  y_top: -1, det_w: 0, det_art: false, det_top: -1, det_h: -1, det_floor_y: -1, det_floor_alt: -1 },
+        rect: { x: 0, y: 0, w: 0, h: 0 }, det_rect: { x: 0, y: 0, w: 0, h: 0 }, hint_hidden: false,
         opened_ms: current_time, closed_ms: -1, cur_y: -1, last_draw_ms: current_time
     };
     if (is_struct(_opts)) {
@@ -4790,17 +4798,24 @@ function Ui_DeltaMark(_x, _y, _dir, _p, _col) {
     }
 }
 
-function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0, _art = undefined) {
+// R-108: _step > 0 sets the sentence one type step smaller (the battle's last resort under the enemy; a sentence with prompt tokens keeps its size).
+function Ui_DetailsSentenceH(_sentence, _w, _step) {
+    if (_step > 0 && !Prompt_HasTokens(_sentence)) return Ui_TextBlockMeasureStep(_sentence, _w, _step).h;
+    return Ui_TextBlockH(_sentence, _w);
+}
+
+// _tight: one pixel unit of air inside the frame instead of two, top and bottom (the battle's last resort).
+function Ui_DetailsHeight(_w, _sentence, _lines, _cols = 1, _seq_n = 0, _art = undefined, _step = 0, _tight = false) {
     var mt = Ui_Metrics();
     var inner = _w - 2 * (4 * mt.p);
-    var h = 2 * (2 * mt.p + mt.pad) + Ui_TextBlockH(_sentence, inner);
+    var h = 2 * (2 * mt.p + (_tight ? mt.p : mt.pad)) + Ui_DetailsSentenceH(_sentence, inner, _step);
     if (Ui_ArtKind(_art) != "") h += Ui_ArtSize() + 2 * mt.p;
     if (_seq_n > 0) h += 13 * max(1, round(mt.p / 2)) + mt.p;
     if (array_length(_lines) > 0) h += mt.p * 2 + Ui_DetailsLinesH(_lines, inner, _cols, mt);
     return h;
 }
 
-function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1, _seq = [], _art = undefined) {
+function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1, _seq = [], _art = undefined, _step = 0, _tight = false) {
     var mt = Ui_Metrics();
     var p = mt.p;
     Ui_DrawFrame(_x, _y, _w, _h, _alpha, p);
@@ -4808,10 +4823,11 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
     draw_set_alpha(_alpha);
     var x0 = _x + 4 * p;
     var x1 = _x + _w - 4 * p;
-    var ty0 = _y + 4 * p;
+    var ty0 = _y + (_tight ? 3 : 4) * p;
     if (Ui_ArtKind(_art) != "") ty0 += Ui_DrawArt((x0 + x1) / 2, ty0, _art, _alpha) + 2 * p;
-    Ui_TextBlock(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST);
-    ty0 += Ui_TextBlockH(_sentence, x1 - x0);
+    if (_step > 0 && !Prompt_HasTokens(_sentence)) Ui_TextBlockStep(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST, _step);
+    else Ui_TextBlock(x0, ty0, _sentence, x1 - x0, UI_C_LIGHTEST);
+    ty0 += Ui_DetailsSentenceH(_sentence, x1 - x0, _step);
     if (array_length(_seq) > 0) {   // the arrows to press (D100), in a dark strip like the card's
         ty0 += p;
         ty0 += CardsUi_DrawArrows(x0, ty0, x1 - x0, _seq, max(1, round(p / 2)));
@@ -4820,26 +4836,25 @@ function Ui_DrawDetails(_x, _y, _w, _h, _sentence, _lines, _alpha = 1, _cols = 1
         ty0 += p;
         Ui_Box(x0, ty0, x1, ty0 + p, UI_C_DARK);
         ty0 += p;
-        var cols = max(1, _cols);
-        var col_w = (x1 - x0 - (cols - 1) * 3 * p) / cols;
-        var row_h = 0;   // H13b (D156): a number line that does not fit one row puts its value on the row below; a label wider than the column wraps
-        for (var i = 0; i < array_length(_lines); i++) {
-            var cx0 = x0 + (i mod cols) * (col_w + 3 * p);
-            var vtxt = string(_lines[i].value);
-            var has_delta = variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0;
-            var lh_i = Ui_DetailsLineH(_lines[i].label, vtxt, col_w, p, has_delta, mt);
-            row_h = max(row_h, lh_i);
-            var vy = ty0 + lh_i - (mt.line_h + p);   // the value is on the line's last row
-            if (UI_TextWidth(_lines[i].label) > col_w) Ui_TextBlock(cx0, ty0, _lines[i].label, col_w, UI_C_LIGHT);
-            else Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
-            Ui_Text(cx0 + col_w, vy, _lines[i].value, UI_C_LIGHTEST, fa_right);
-            if (has_delta) {
-                Ui_DeltaMark(cx0 + col_w - UI_TextWidth(_lines[i].value) - 7 * p, vy + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+        var plan = Ui_DetailsPlan(_lines, x1 - x0, _cols, mt);   // H13b (D156): a number line that does not fit one row puts its value on the row below; a label wider than the column wraps
+        for (var r = 0; r < array_length(plan.rows); r++) {
+            var prow = plan.rows[r];
+            for (var c = 0; c < array_length(prow.cells); c++) {
+                var cell = prow.cells[c];
+                var i = cell.i;
+                var cx0 = x0 + cell.x;
+                var vtxt = string(_lines[i].value);
+                var has_delta = variable_struct_exists(_lines[i], "delta") && _lines[i].delta != 0;
+                var lh_i = Ui_DetailsLineH(_lines[i].label, vtxt, cell.w, p, has_delta, mt);
+                var vy = ty0 + lh_i - (mt.line_h + p);   // the value is on the line's last row
+                if (UI_TextWidth(_lines[i].label) > cell.w) Ui_TextBlock(cx0, ty0, _lines[i].label, cell.w, UI_C_LIGHT);
+                else Ui_Text(cx0, ty0, _lines[i].label, UI_C_LIGHT);
+                Ui_Text(cx0 + cell.w, vy, _lines[i].value, UI_C_LIGHTEST, fa_right);
+                if (has_delta) {
+                    Ui_DeltaMark(cx0 + cell.w - UI_TextWidth(_lines[i].value) - 7 * p, vy + (mt.line_h - 3 * p) div 2, _lines[i].delta, p, (_lines[i].delta > 0) ? UI_C_LIGHTEST : UI_C_LIGHT);
+                }
             }
-            if ((i mod cols) == cols - 1 || i == array_length(_lines) - 1) {
-                ty0 += row_h;
-                row_h = 0;
-            }
+            ty0 += prow.h;
         }
     }
     draw_set_alpha(a0);
@@ -5032,21 +5047,63 @@ function Ui_DetailsLineH(_label, _value, _col_w, _p, _delta, _mt) {
     return (Ui_DetailsLineStacked(_label, _value, _col_w, _p, _delta) ? 2 : 1) * (_mt.line_h + _p);
 }
 
-// The number lines' height in a details panel whose inner width is _inner, _cols to a row.
-function Ui_DetailsLinesH(_lines, _inner, _cols, _mt) {
+// How the number lines of a details panel are laid out, _inner wide, _cols to a row: { rows: [{ h, cells: [{ i (the line), x (from the inner left edge), w (the cell's width) }] }], h }.
+// R-108: a row of line cells that are not all one text row tall in their column (a value that would stack under its label, a label that wraps) is not laid out side by side:
+// each of its lines takes a row of its own, the whole width ("Damage 17" over "Perfect 22", never a value alone on the row under its label).
+function Ui_DetailsPlan(_lines, _inner, _cols, _mt) {
     var p = _mt.p;
     var cols = max(1, _cols);
     var col_w = (_inner - (cols - 1) * 3 * p) / cols;
     var n = array_length(_lines);
+    var one = _mt.line_h + p;
+    var rows = [];
     var h = 0;
     for (var i = 0; i < n; i += cols) {
         var rh = 0;
+        var cells = [];
+        var tall = false;
         for (var c = 0; c < cols && i + c < n; c++) {
-            rh = max(rh, Ui_DetailsLineH(_lines[i + c].label, _lines[i + c].value, col_w, p, variable_struct_exists(_lines[i + c], "delta") && _lines[i + c].delta != 0, _mt));
+            var dl = _lines[i + c];
+            var ch = Ui_DetailsLineH(dl.label, dl.value, col_w, p, variable_struct_exists(dl, "delta") && dl.delta != 0, _mt);
+            if (ch > one) tall = true;
+            rh = max(rh, ch);
+            array_push(cells, { i: i + c, x: c * (col_w + 3 * p), w: col_w });
         }
-        h += rh;
+        var need_sum = 0;
+        for (var c3 = 0; c3 < array_length(cells); c3++) {
+            var dl3 = _lines[cells[c3].i];
+            need_sum += Ui_DetailsLineNeed(dl3.label, dl3.value, p, variable_struct_exists(dl3, "delta") && dl3.delta != 0);
+        }
+        if (tall && cols > 1 && array_length(cells) > 1 && need_sum + (array_length(cells) - 1) * 3 * p <= _inner) {
+            // the equal columns are too narrow for one of them but the lines fit one row at their own width: first at the left edge, last at the right edge, each as wide as it needs
+            var cx = 0;
+            for (var c4 = 0; c4 < array_length(cells); c4++) {
+                var dl4 = _lines[cells[c4].i];
+                var nw = Ui_DetailsLineNeed(dl4.label, dl4.value, p, variable_struct_exists(dl4, "delta") && dl4.delta != 0);
+                cells[c4].w = nw;
+                cells[c4].x = (c4 == array_length(cells) - 1) ? (_inner - nw) : cx;
+                cx += nw + 3 * p;
+            }
+            array_push(rows, { h: one, cells: cells });
+            h += one;
+        } else if (tall && cols > 1) {
+            for (var c2 = 0; c2 < array_length(cells); c2++) {
+                var dl2 = _lines[cells[c2].i];
+                var fh = Ui_DetailsLineH(dl2.label, dl2.value, _inner, p, variable_struct_exists(dl2, "delta") && dl2.delta != 0, _mt);
+                array_push(rows, { h: fh, cells: [{ i: cells[c2].i, x: 0, w: _inner }] });
+                h += fh;
+            }
+        } else {
+            array_push(rows, { h: rh, cells: cells });
+            h += rh;
+        }
     }
-    return h;
+    return { rows: rows, h: h };
+}
+
+// The number lines' height in a details panel whose inner width is _inner, _cols to a row.
+function Ui_DetailsLinesH(_lines, _inner, _cols, _mt) {
+    return Ui_DetailsPlan(_lines, _inner, _cols, _mt).h;
 }
 
 // Level 1: the widths of the rows (uncached).
@@ -5168,23 +5225,35 @@ function Ui_MenuMeasure(_m, _mt) {
     return mc;
 }
 
-// Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
-// the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
-// Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
-function Ui_MenuDraw(_m, _alpha = 1) {
-    if (_alpha <= 0) return;
-    if (TabNote_IsReader(_m)) { TabNote_ReaderDraw(_m, _alpha); return; }   // D147: the note reader is a text panel, not a list
-    var mt = Ui_Metrics();
+// R-108: the number lines a details panel keeps when it has to give way (the battle panel under the enemy). Level 1: the lines the row marks keep: true (a skill's Damage, Perfect and MP); a
+// row that marks none keeps its first line (an item's main effect); the rest (Power, Hits, Turns, Chance, Carry Limit...) go first. Level 2 (the last resort): of those, the lines the list row
+// already shows (dup: true, a skill's MP) go too, and a row that marks none keeps no line. Order as given.
+function Ui_DetailsKeepLines(_lines, _level = 1) {
+    var n = array_length(_lines);
+    var out = [];
+    var marked = false;
+    for (var i = 0; i < n; i++) if (variable_struct_exists(_lines[i], "keep") && _lines[i].keep) marked = true;
+    for (var j = 0; j < n; j++) {
+        var kept = marked ? (variable_struct_exists(_lines[j], "keep") && _lines[j].keep) : (j == 0);
+        if (kept && _level >= 2 && (!marked || (variable_struct_exists(_lines[j], "dup") && _lines[j].dup))) kept = false;
+        if (kept) array_push(out, _lines[j]);
+    }
+    return out;
+}
+
+// The height a panel above its list takes under a floor: details _det_h, the gap, the list's chrome and _rows rows (tall rows counted at the most any rows can add; one row is the highlighted row's own).
+function Ui_AboveNeed(_det_h, _gap, _chrome_y, _rows, _rhs, _mt, _cur) {
+    return _det_h + _gap + _chrome_y + ((_rows <= 1) ? _rhs[_cur] : (_rows * _mt.row_h + Ui_ExtraSum(_rhs, _mt.row_h, _rows)));
+}
+
+// The geometry of a menu for one draw: the list panel, the details panel, the rows' window, from the measured struct _mm (Ui_MenuMeasure) and the menu's layout. Pure: it draws and
+// stores nothing (Ui_MenuDraw draws from it; the fit checks read it without a draw). _alpha slides the panel in (D97).
+function Ui_MenuGeom(_m, _mt, _mm, _alpha = 1) {
+    var mt = _mt;
     var p = mt.p;
     var L = _m.layout;
     var n = array_length(_m.items);
-    var now = current_time;
-    var a0 = draw_get_alpha();
-    var c0 = draw_get_color();
-    var bar_w = 14 * p;
-
-    // widths and the details panel's height: measured once per change (Ui_MenuMeasure), not every frame
-    var mm = Ui_MenuMeasure(_m, mt);
+    var mm = _mm;
     var icon_px = mm.icon_px;     // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
     var panel_w = mm.panel_w;
     var title_fit = (L.title != "") ? Ui_TitleFit(L.title, panel_w - 8 * p, mt) : undefined;   // R-106: a title wider than the panel wraps (a long skill name in "Learn X: Replace Which?")
@@ -5199,22 +5268,48 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var seq_drop = false;         // G10: the arrow strip is left out of the details when nothing else makes room
     var gap = mt.margin;          // the space between the list and its details panel
     var one_row = false;          // R-106: the list is a window of one row, as tall as the highlighted row
+    var lines_level = 0;          // R-108: 0 = every number line is shown, 1 = the kept lines, 2 = the last resort (Ui_DetailsKeepLines)
+    var det_tight = false;        // R-108: the last resort: the panels share a border (gap -2p) and the details have one pixel unit of air inside the frame, not two
+    var det_step = 0;             // R-108: the sentence is set one type step smaller (the last resort)
+    var hint_hidden = false;      // R-108: the prompt line over the details panel is left out when nothing else makes room
+    var cur_it = (n > 0) ? _m.items[clamp(_m.cursor, 0, n - 1)] : undefined;
+    var lines_shown = (is_struct(cur_it) && variable_struct_exists(cur_it, "lines")) ? cur_it.lines : [];   // the number lines the details panel draws
     if (L.details && L.details_pos == "above" && det_h > 0 && n > 0 && L.det_floor_y >= 0) {
+        // G10 (D129) / R-108: the panel and the list stand under the floor (the enemy). When they do not fit: the details drop their least important lines first (every line that is
+        // not kept, then the arrow strip), then the list shows fewer rows (two, then one); last, the gap between the panels shrinks to one pixel unit.
         var fit_bottom = (L.y_bottom >= 0) ? L.y_bottom : (mt.gh - mt.margin);
         var fit_room = fit_bottom - L.det_floor_y;
         var fit_rows = (L.rows_max > 0) ? min(n, L.rows_max) : n;
-        if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) {
-            fit_rows = min(2, fit_rows);
-            if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) {
-                var fc = _m.items[clamp(_m.cursor, 0, n - 1)];
-                var det_flat = Ui_DetailsHeight(panel_w, fc.help, variable_struct_exists(fc, "lines") ? fc.lines : [], L.details_cols, 0);
-                if (variable_struct_exists(fc, "seq") && array_length(fc.seq) > 0 && det_flat < det_h) { det_h = det_flat; seq_drop = true; }
-                if (det_h + mt.margin + chrome_y + fit_rows * mt.row_h + Ui_ExtraSum(rhs, mt.row_h, fit_rows) > fit_room) fit_rows = 1;
+        var ci = clamp(_m.cursor, 0, n - 1);
+        if (Ui_AboveNeed(det_h, mt.margin, chrome_y, fit_rows, rhs, mt, ci) > fit_room) {
+            var seq_n = (is_struct(cur_it) && variable_struct_exists(cur_it, "seq")) ? array_length(cur_it.seq) : 0;
+            var keeps = [lines_shown, Ui_DetailsKeepLines(lines_shown, 1), Ui_DetailsKeepLines(lines_shown, 2)];   // by level: 0 all, 1 kept, 2 last resort
+            var cols = L.details_cols;
+            var sent = is_struct(cur_it) ? cur_it.help : "";
+            // [lines level, keep the arrow strip, rows, hide the hint, the sentence's type step, tight: the panels share a border and the details have less air]
+            var steps = [[1, true, fit_rows, false, 0, false], [1, false, fit_rows, false, 0, false], [1, false, min(2, fit_rows), false, 0, false], [1, false, 1, false, 0, false], [1, false, 1, true, 0, false],
+                         [2, false, 1, true, 0, false], [2, false, 1, true, 1, false], [2, false, 1, true, 1, true]];
+            var pick = array_length(steps) - 1;
+            var picked_h = -1;
+            var picked_room = fit_room;
+            for (var st = 0; st < array_length(steps); st++) {
+                var st_room = (steps[st][3] && L.det_floor_alt >= 0) ? (fit_bottom - L.det_floor_alt) : fit_room;
+                var sh = Ui_DetailsHeight(panel_w, sent, keeps[steps[st][0]], cols, steps[st][1] ? seq_n : 0, undefined, steps[st][4], steps[st][5]);
+                var st_gap = steps[st][5] ? -2 * p : ((steps[st][2] == 1) ? p : mt.margin);   // a window of one row may shrink the gap to one pixel unit
+                if (Ui_AboveNeed(sh, st_gap, chrome_y, steps[st][2], rhs, mt, ci) <= st_room || st == array_length(steps) - 1) { pick = st; picked_h = sh; picked_room = st_room; break; }
             }
-            rows_lim = fit_rows;
-            if (fit_rows == 1 && n > 0) {   // R-106: a window of one row is as tall as the highlighted row (not the tallest); still too tall for the room: the gap between the panels shrinks to one pixel unit
+            lines_shown = keeps[steps[pick][0]];
+            lines_level = steps[pick][0];
+            if (!steps[pick][1] && seq_n > 0) seq_drop = true;
+            hint_hidden = steps[pick][3];
+            det_step = steps[pick][4];
+            det_tight = steps[pick][5];
+            det_h = picked_h;
+            rows_lim = steps[pick][2];
+            if (rows_lim == 1) {   // R-106: a window of one row is as tall as the highlighted row (not the tallest); still too tall for the room: the gap between the panels shrinks to one pixel unit
                 one_row = true;
-                if (det_h + gap + chrome_y + rhs[clamp(_m.cursor, 0, n - 1)] > fit_room) gap = p;
+                if (det_tight) gap = -2 * p;
+                else if (Ui_AboveNeed(det_h, gap, chrome_y, 1, rhs, mt, ci) > picked_room) gap = p;
             }
         }
     }
@@ -5242,12 +5337,54 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     var det_above = (det_h > 0 && L.details_pos == "above");
     var list_y = det_above ? (py + det_h + gap) : py;     // the list panel's top; the details panel is above or below it
     var det_y = det_above ? py : (py + panel_h + gap);
-    _m.rect = { x: px, y: list_y, w: panel_w, h: panel_h };
-    _m.det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
+    var rect = { x: px, y: list_y, w: panel_w, h: panel_h };
+    var det_rect = (det_h > 0) ? { x: px, y: det_y, w: panel_w, h: det_h } : { x: 0, y: 0, w: 0, h: 0 };
     if (det_right) {
         var dx = px + panel_w + mt.margin;
-        _m.det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
+        det_rect = { x: dx, y: ((L.det_top >= 0) ? L.det_top - slide : list_y), w: (L.det_w > 0) ? L.det_w : max(0, mt.gw - mt.margin - dx), h: (L.det_h >= 0) ? L.det_h : panel_h };
     }
+    return { rect: rect, det_rect: det_rect, icon_px: icon_px, panel_w: panel_w, title_fit: title_fit, header_h: header_h, note_h: note_h, chrome_y: chrome_y, rhs: rhs, extra: extra, all_h: all_h, det_h: det_h, seq_drop: seq_drop,
+             gap: gap, det_right: det_right, list_room: list_room, panel_h: panel_h, total_h: total_h, px: px, py: py, slide: slide, det_above: det_above, list_y: list_y, det_y: det_y, one_row: one_row, rows_lim: rows_lim, rows_vis: rows_vis, lines_shown: lines_shown, lines_level: lines_level, hint_hidden: hint_hidden, det_step: det_step, det_tight: det_tight };
+}
+
+// Draws one menu: frame, optional title, rows (label left, value / slider right), the gliding highlight with a bobbing marker, and
+// the details panel of the highlighted item when layout.details is set. _alpha 0..1 fades and slides the panel (D97).
+// Stores each row's rectangle in m.rects for the mouse. Needs UI_SetFont-compatible state; sets and restores the draw state.
+function Ui_MenuDraw(_m, _alpha = 1) {
+    if (_alpha <= 0) return;
+    if (TabNote_IsReader(_m)) { TabNote_ReaderDraw(_m, _alpha); return; }   // D147: the note reader is a text panel, not a list
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
+    var n = array_length(_m.items);
+    var now = current_time;
+    var a0 = draw_get_alpha();
+    var c0 = draw_get_color();
+    var bar_w = 14 * p;
+
+    // widths and the details panel's height: measured once per change (Ui_MenuMeasure), not every frame
+    var mm = Ui_MenuMeasure(_m, mt);
+    var g = Ui_MenuGeom(_m, mt, mm, _alpha);
+    var icon_px = g.icon_px;      // the icon column (battle lists): one icon pixel is k GUI units, k = whole units that fit a row
+    var panel_w = g.panel_w;
+    var title_fit = g.title_fit;
+    var header_h = g.header_h;
+    var note_h = g.note_h;
+    var rhs = g.rhs;              // R-106: each row's height (a label that wraps makes a taller row) and how its label is laid out
+    var extra = g.extra;          // the most any row is taller than a normal one (0: every row is a normal row)
+    var det_h = g.det_h;          // the highlighted item's own when the panel is above (the tallest sentence otherwise)
+    var seq_drop = g.seq_drop;    // G10: the arrow strip is left out of the details when nothing else makes room
+    var det_right = g.det_right;
+    var list_room = g.list_room;
+    var panel_h = g.panel_h;
+    var px = g.px;
+    var slide = g.slide;
+    var det_above = g.det_above;
+    var list_y = g.list_y;
+    var det_y = g.det_y;
+    _m.rect = g.rect;
+    _m.det_rect = g.det_rect;
+    _m.hint_hidden = g.hint_hidden;
 
     _m.top = Ui_ScrollTopH(_m.cursor, _m.top, rhs, list_room);
     var vis_end = (n > 0) ? Ui_RowsEnd(rhs, _m.top, list_room) : -1;
@@ -5378,7 +5515,7 @@ function Ui_MenuDraw(_m, _alpha = 1) {
     if (det_h > 0 && n > 0) {
         var cur = _m.items[_m.cursor];
         if (variable_struct_exists(cur, "help")) {
-            Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, variable_struct_exists(cur, "lines") ? cur.lines : [], _alpha, L.details_cols, (variable_struct_exists(cur, "seq") && !seq_drop) ? cur.seq : []);
+            Ui_DrawDetails(px, det_y, panel_w, det_h, cur.help, g.lines_shown, _alpha, L.details_cols, (variable_struct_exists(cur, "seq") && !seq_drop) ? cur.seq : [], undefined, g.det_step, g.det_tight);
         }
     }
     if (det_right && n > 0 && _m.det_rect.w > 0) {
