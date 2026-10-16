@@ -3349,72 +3349,244 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 }
 
 // --------------------
-// TITLE MENU (D0 pilot on the UI framework)
+// TITLE MENU (D0 pilot on the UI framework; D175: profiles and three save files)
 // --------------------
 // obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "splash" | "cutscene") and holds the menu stack in title_stk: [title].
-// Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only); over a saved run it asks first (D156).
-function Title_MainItems(_can_load) {
+// The rows (D175): Continue (the active profile's last played save file), New Game (the first empty save file, or a picker "Overwrite which save file?" when all
+// three are used), Load Game (a picker of the three save files), Settings, Quit. New Game starts the run on Normal (D35: one difficulty only) after the seed pick.
+function Title_Pad2(_n) {
+    return ((_n < 10) ? "0" : "") + string(_n);
+}
+
+// "Save 1" .. "Save 3".
+function Title_SlotName(_slot) {
+    return Loc_T("save.slot.name", "Save {n}", { n: string(_slot + 1) });
+}
+
+// A save's stamp as "2026-10-16 14:05"; "-" when the file has none (a datetime of a run file is a real, -1 when missing).
+function Title_FormatSaved(_dt) {
+    if (!is_real(_dt) || _dt <= 0) return "-";
+    return string(date_get_year(_dt)) + "-" + Title_Pad2(date_get_month(_dt)) + "-" + Title_Pad2(date_get_day(_dt)) + " " + Title_Pad2(date_get_hour(_dt)) + ":" + Title_Pad2(date_get_minute(_dt));
+}
+
+// What the title needs to know about a profile's save files (the active one by default): { pid, cont (the Continue target, -1 = none), first_empty (-1 = all used),
+// any (some file exists, even a damaged one: Load Game is on), slots (Slots_Summary) }. Reads the files.
+function Title_State(_pid = undefined) {
+    var pid = is_undefined(_pid) ? Profiles_Active() : _pid;
+    var sl = Slots_Summary(pid);
+    var any = false;
+    var first = -1;
+    for (var i = 0; i < array_length(sl); i++) {
+        if (sl[i].exists) any = true;
+        else if (first < 0) first = sl[i].slot;
+    }
+    return { pid: pid, cont: Slots_ContinueTarget(pid), first_empty: first, any: any, slots: sl };
+}
+
+function Title_MainItems(_can_continue, _can_load) {
     return [
+        { id: "continue", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_continue },   // C1 (D46): Continue run; D175: the last played save file
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
-        { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
+        { id: "load", label: Loc_T("menu.main.option.1", "Load Game"), kind: "button", enabled: _can_load },
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Quit Game"), kind: "button", enabled: true }
     ];
 }
 
+// New Game's plan from the first empty save file (-1 = none): { kind: "start", slot } or { kind: "overwrite", slot: -1 } (the picker asks which file to give up).
+function Title_NewPlan(_first_empty) {
+    if (_first_empty >= 0) return { kind: "start", slot: _first_empty };
+    return { kind: "overwrite", slot: -1 };
+}
+
+// The card of the Continue target's run (D128: read, never applied).
+function Title_CardOf(_st) {
+    return (_st.cont >= 0) ? Title_CardLoad(Slots_PathOf(_st.pid, _st.cont)) : Title_CardNone();
+}
+
 function Title_Build(_c) {
     _c.title_stk = Ui_StackNew();
-    var has_run = RunSave_HasSave();
-    var m = Ui_MenuNew("title", Title_MainItems(has_run), {
+    var st = Title_State();
+    var m = Ui_MenuNew("title", Title_MainItems(st.cont >= 0, st.any), {
         owner: _c, on_confirm: Title_OnConfirm,
         layout: { anchor: "bottom", y_frac: 0.62, center: true }
     });
-    if (has_run) Ui_MenuFixCursor(m, 1);   // review 1: with a run saved the cursor starts on Continue, not on New Game
+    Ui_MenuFixCursor(m, (st.cont >= 0) ? 0 : 1);   // review 1: with a run saved the cursor starts on Continue, else on New Game
     Ui_StackPush(_c.title_stk, m);
     _c.title_refresh = false;
     _c.title_seed = undefined;   // D152: the seed entry screen (a SeedEntry struct while it is open)
-    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();   // D128: read, never applied
+    _c.title_card = Title_CardOf(st);   // D128: read, never applied
 }
 
 // Language or save files may have changed since the labels were made.
 function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
-    var has_run = RunSave_HasSave();
-    m.items = Title_MainItems(has_run);
-    Ui_MenuFixCursor(m, m.cursor);
+    var st = Title_State();
+    m.items = Title_MainItems(st.cont >= 0, st.any);
+    if (variable_instance_exists(_c, "title_cursor_reset") && _c.title_cursor_reset) {   // another profile: the cursor starts where a fresh title would put it
+        Ui_MenuFixCursor(m, (st.cont >= 0) ? 0 : 1);
+        _c.title_cursor_reset = false;
+    } else {
+        Ui_MenuFixCursor(m, m.cursor);
+    }
     _c.title_refresh = false;
-    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();
+    _c.title_card = Title_CardOf(st);
 }
 
-// D35: no difficulty menu. D152: New Game goes on to the seed pick (Random seed first, or Enter seed); the title fades out after that pick (Title_NewGameGo),
-// then the run (or the intro cutscene) is requested.
-function Title_NewGo(_c, _m) {
-    Title_SeedChoiceOpen(_c);
+// ---- save files: the Load Game picker and the overwrite picker (D175) ----
+// The rows of a picker from Slots_Summary entries. _mode "load": an empty file is greyed; "overwrite": every file is a row you can pick. A file this build cannot read
+// (newer, old, damaged) reads "Cannot load" and can still be selected, so it can be deleted. { id, slot, label, value, status, enabled, dim, help, lines }.
+function Title_SlotRows(_sums, _mode) {
+    var rows = [];
+    for (var i = 0; i < array_length(_sums); i++) {
+        var sm = _sums[i];
+        var row = { id: "slot_" + string(sm.slot), slot: sm.slot, label: Title_SlotName(sm.slot), value: "", status: sm.status, kind: "button", enabled: true, dim: false, help: "", lines: [], hint: "" };
+        if (sm.status == "empty") {
+            row.value = Loc_T("save.slot.empty", "Empty");
+            row.enabled = (_mode != "load");
+            row.dim = true;
+            row.help = Loc_T("save.slot.help_empty", "No run is saved in this file.");
+        } else if (sm.status == "ok") {
+            var cname = DB_PlayerClass(sm.class_id).name;
+            row.value = (sm.level >= 0) ? Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(floor(sm.level)) }) : string(cname);
+            row.help = (_mode == "overwrite") ? Loc_T("save.slot.help_over", "A new game here replaces this run.") : Loc_T("save.slot.help_load", "Pick up this run where you left it.");
+            if (sm.floor >= 0) array_push(row.lines, { label: Loc_T("tab.lbl.floor", "Floor"), value: string(floor(sm.floor)) });
+            if (sm.run_time_ms >= 0) array_push(row.lines, { label: Loc_T("title.card.time", "Time"), value: Title_FormatTime(sm.run_time_ms) });
+            array_push(row.lines, { label: Loc_T("save.lbl.saved", "Last Saved"), value: Title_FormatSaved(sm.saved_at) });
+        } else {
+            row.value = Loc_T("save.slot.cant", "Cannot load");
+            row.dim = true;
+            row.help = Run_ContinueFailText(sm.status);
+        }
+        array_push(rows, row);
+    }
+    return rows;
 }
 
-function Title_NewYes(_d) {
-    Title_NewGo(_d.c, _d.m);
+// Opens a picker above the title menu: "load" (Load Game) or "overwrite" (New Game with all three files used). The cursor starts on the first row you can pick.
+function Title_PickerOpen(_c, _mode) {
+    var st = Title_State();
+    var m = Ui_MenuNew("slots_" + _mode, Title_SlotRows(st.slots, _mode), {
+        owner: _c, on_confirm: Title_PickerConfirm, data: { mode: _mode },
+        layout: { title: (_mode == "overwrite") ? Loc_T("save.overwrite.title", "Overwrite which save file?") : Loc_T("menu.main.option.1", "Load Game"), anchor: "center", details: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    Ui_StackPush(_c.title_stk, m);
+    return m;
 }
 
-// New Game: a saved run is abandoned by it (review 1), so with one saved the shared Yes / No pop-up asks first (D156); otherwise it starts at once.
-function Title_NewPress(_c, _m, _has_run) {
-    if (_has_run) {
-        Confirm_Open(Loc_T("confirm.new_game", "Start a new game? The saved run will be abandoned."), Title_NewYes, { c: _c, m: _m });
+// The screens above the title with their own key line: the two save file pickers and the profile screen.
+function Title_IsPicker(_m) {
+    return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "mode") && (_m.id == "slots_load" || _m.id == "slots_overwrite" || _m.id == "profiles");
+}
+
+// Loads a save file: it becomes the active one (what autosaves write to) and the run is entered. A file this build cannot read says why. Returns true when the load began.
+function Title_LoadSlot(_slot) {
+    Slot_SetActive(_slot);
+    var cont = Run_Continue();
+    if (!cont.ok) Notice_Open(Run_ContinueFailText(cont.status));
+    return cont.ok;
+}
+
+function Title_PickerConfirm(_m, _i) {
+    var c = _m.owner;
+    var row = _m.items[_i];
+    if (_m.data.mode == "overwrite") {
+        Confirm_Open(Loc_T("save.overwrite.ask", "Overwrite Save {n}? The run in it will be lost.", { n: string(row.slot + 1) }), Title_OverwriteYes, { c: c, slot: row.slot });
         return;
     }
-    Title_NewGo(_c, _m);
+    if (row.status != "ok") {
+        Notice_Open(Run_ContinueFailText(row.status));
+        return;
+    }
+    Title_LoadSlot(row.slot);
+}
+
+// Yes to "Overwrite Save n?": the file is given up when the run really starts (Title_NewGameGo), so Back from the seed pick loses nothing.
+function Title_OverwriteYes(_d) {
+    _d.c.title_new_slot = _d.slot;
+    _d.c.title_new_wipe = true;
+    Title_SeedChoiceOpen(_d.c);
+}
+
+// The delete key on a Load Game row: asks Yes / No (D175). An empty file has nothing to delete. Returns true when it asked.
+function Title_PickerDeleteAsk(_c, _m) {
+    if (!Title_IsPicker(_m) || _m.data.mode != "load" || array_length(_m.items) <= 0) return false;
+    var row = _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)];
+    if (row.status == "empty") {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Confirm_Open(Loc_T("save.delete.ask", "Delete Save {n}? The run in it will be lost.", { n: string(row.slot + 1) }), Title_DeleteYes, { c: _c, m: _m, slot: row.slot });
+    return true;
+}
+
+// Yes: the file goes (a run in it counts as abandoned in the history); the picker shows the new state, or closes when nothing is left to load.
+function Title_DeleteYes(_d) {
+    Slot_Delete(Profiles_Active(), _d.slot);
+    var st = Title_State();
+    _d.c.title_refresh = true;
+    if (!st.any) {
+        Ui_StackBack(_d.c.title_stk);
+        return;
+    }
+    _d.m.items = Title_SlotRows(st.slots, _d.m.data.mode);
+    Ui_MenuFixCursor(_d.m, _d.m.cursor);
+}
+
+// The keys only the pickers have, before the menu steps: the delete key (Q / the pad's LB), or a right click on a row (a right click elsewhere is Back); on Load Game and on the
+// profile screen. True when it was used.
+function Title_PickerKeys(_c, _m) {
+    if (!Title_IsPicker(_m) || (_m.data.mode != "load" && _m.data.mode != "profiles") || current_time - _m.lock_ms < UI_INPUT_LOCK_MS) return false;
+    var prof = (_m.data.mode == "profiles");
+    if (Input_Pressed("tab_prev")) return prof ? Title_ProfileDeleteAsk(_c, _m) : Title_PickerDeleteAsk(_c, _m);
+    if (mouse_check_button_pressed(mb_right)) {
+        var mp = Ui_MousePos();
+        var hv = Ui_HoverIndex(_m.rects, mp.x, mp.y);
+        if (hv >= 0) {
+            _m.cursor = hv;
+            return prof ? Title_ProfileDeleteAsk(_c, _m) : Title_PickerDeleteAsk(_c, _m);
+        }
+    }
+    return false;
+}
+
+// New Game: the first empty save file takes the run, with no question; with all three used the overwrite picker asks which one to give up (and then Yes / No). D152: the
+// seed pick follows; the title fades out after it (Title_NewGameGo), then the run (or the intro cutscene) is requested.
+function Title_NewPress(_c, _m) {
+    var plan = Title_NewPlan(Title_State().first_empty);
+    _c.title_new_slot = -1;
+    _c.title_new_wipe = false;
+    if (plan.kind == "start") {
+        _c.title_new_slot = plan.slot;
+        Title_SeedChoiceOpen(_c);
+    } else {
+        Title_PickerOpen(_c, "overwrite");
+    }
+}
+
+// Continue: the last played save file of the active profile.
+function Title_ContinuePress(_c) {
+    var t = Slots_ContinueTarget();
+    if (t < 0) {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    return Title_LoadSlot(t);
 }
 
 function Title_OnConfirm(_m, _i) {
     var c = _m.owner;
     var rid = _m.items[_i].id;
     switch (rid) {
-        case "new":
-            Title_NewPress(c, _m, RunSave_HasSave());
+        case "continue":   // C1 (D46): Continue run
+            Title_ContinuePress(c);
             break;
-        case "load":   // C1 (D46): Continue run
-            var cont = Run_Continue();
-            if (!cont.ok) Notice_Open(Run_ContinueFailText(cont.status));
+        case "new":
+            Title_NewPress(c, _m);
+            break;
+        case "load":
+            Title_PickerOpen(c, "load");
             break;
         case "settings":
             SettingsPopup_Open("title");
@@ -3422,6 +3594,655 @@ function Title_OnConfirm(_m, _i) {
             break;
         case "exit": game_end(); break;
     }
+}
+
+// The keys of the screen on top of the title, as groups ("[k:confirm] Load"): one framed line in the lower left corner (clear of the build id in the lower right) when they
+// fit side by side, else one group to a row, so a key never wraps away from its word. Load Game also names the delete key.
+function Title_HintGroups(_m) {
+    if (!is_struct(_m)) return [];
+    var back = Loc_T("tab.hint.back", "[k:back] Back");
+    if (_m.id == "slots_load") return [Loc_T("save.hint.load", "[k:confirm] Load"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), back];
+    if (_m.id == "slots_overwrite") return [Loc_T("save.hint.overwrite", "[k:confirm] Overwrite"), back];
+    if (_m.id == "profiles") {
+        var row = (array_length(_m.items) > 0) ? _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)] : undefined;
+        if (is_struct(row) && row.pid < 0) return [Loc_T("profile.hint.create", "[k:confirm] Create"), back];
+        return [Loc_T("profile.hint.switch", "[k:confirm] Switch"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), back];
+    }
+    return [];
+}
+
+function Title_HintJoin(_groups, _sep) {
+    var out = "";
+    for (var i = 0; i < array_length(_groups); i++) out += ((i > 0) ? _sep : "") + _groups[i];
+    return out;
+}
+
+// The key line for a list of groups: { txt, lay, inner_w, rect } (rect.w = 0 and no text without groups).
+function Title_HintPlanOf(_groups) {
+    var plan = { txt: "", lay: undefined, inner_w: 0, rect: { x: 0, y: 0, w: 0, h: 0 } };
+    if (array_length(_groups) <= 0) return plan;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var idr = Build_IdRect();
+    plan.inner_w = max(8 * p, idr.x - 2 * mt.margin - 4 * p - 8 * p);
+    plan.txt = Title_HintJoin(_groups, "    ");
+    plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
+    if (plan.lay.lines > 1) {
+        plan.txt = Title_HintJoin(_groups, chr(10));
+        plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
+    }
+    var lw = 0;
+    for (var i = 0; i < array_length(plan.lay.line_w); i++) lw = max(lw, plan.lay.line_w[i]);
+    var w = lw + 8 * p;
+    var h = plan.lay.h + 8 * p;
+    plan.rect = { x: mt.margin, y: mt.gh - mt.margin - h, w: w, h: h };
+    return plan;
+}
+
+// The key line of the screen on top of the title.
+function Title_HintPlan(_c, _m) {
+    return Title_HintPlanOf(Title_HintGroups(_m));
+}
+
+// A picker keeps clear of the key line and of the build id: the list with its details below it, centred between the top margin and the key line, when that fits; else (a big
+// text size) the details stand beside the list, in the same band. Called before the draw; the layout it sets is what the draw uses.
+function Title_PickerFit(_c, _m) {
+    if (!Title_IsPicker(_m)) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var L = _m.layout;
+    var hp = Title_HintPlan(_c, _m);
+    var top_y = mt.margin;
+    var bot_y = ((hp.rect.w > 0) ? hp.rect.y : mt.gh - mt.margin) - mt.margin;
+    var avail = bot_y - top_y;
+    L.details_pos = "below";   // measured first as the stacked layout
+    L.x_anchor = "center";
+    L.panel_w = 0;
+    L.y_top = -1;
+    L.det_w = 0;
+    L.det_top = -1;
+    L.det_h = -1;
+    L.max_h = 0;
+    var mm = Ui_MenuMeasure(_m, mt);
+    var n = array_length(_m.items);
+    var chrome = 8 * p + ((L.title != "") ? (mt.line_h + 3 * p) : 0);
+    var below_h = chrome + n * mt.row_h + ((mm.det_h > 0) ? mt.margin + mm.det_h : 0);
+    if (below_h <= avail) {
+        L.y_top = top_y + round((avail - below_h) / 2);
+        return;
+    }
+    var mc = Ui_MenuMeasureRowsFresh(_m, mt);
+    var total_w = mt.gw - 3 * mt.margin;
+    var half_w = floor(total_w * 0.5 / p) * p;
+    var z = { mt: mt, list_w: half_w, det_w: total_w - half_w };
+    var wd = TabMenu_Widths(z, Ui_MenuListNeed(mc, p), mc.det_need);
+    var det_need_h = 0;   // the tallest details text at the narrower width it has beside the list
+    for (var di = 0; di < n; di++) det_need_h = max(det_need_h, Ui_DetailsHeight(wd.det_w, _m.items[di].help, variable_struct_exists(_m.items[di], "lines") ? _m.items[di].lines : [], 1));
+    var need_h = max(chrome + n * mt.row_h, det_need_h);
+    var h = min(avail, need_h);
+    L.details_pos = "right";
+    L.x_anchor = "left";
+    L.panel_w = wd.list_w;
+    L.y_top = top_y + round((avail - h) / 2);
+    L.max_h = h;
+    L.det_w = wd.det_w;
+    L.det_top = L.y_top;
+    L.det_h = h;
+}
+
+// Draws that line; the rectangle is kept in _c.title_hint_rect for -shots.
+function Title_DrawKeyPlan(_hp, _a) {
+    var p = Ui_Metrics().p;
+    var r = _hp.rect;
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, _a, p);
+    Prompt_RichDraw(r.x + 4 * p, r.y + 4 * p, _hp.txt, _hp.inner_w, UI_C_LIGHT, fa_left, _a);
+    draw_set_alpha(1);
+}
+
+function Title_DrawHints(_c) {
+    _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
+    var top = Ui_StackTop(_c.title_stk);
+    var hp = Title_HintPlan(_c, top);
+    if (hp.txt == "") return;
+    var a = Ui_MenuAlpha(top, current_time);
+    if (a <= 0) return;
+    _c.title_hint_rect = hp.rect;
+    Title_DrawKeyPlan(hp, a);
+}
+
+// ---- D175: the name entry (a new profile's name) ----
+// A name is 1..PROFILE_NAME_MAX characters from A-Z, 0-9 and space (no space first, none twice in a row); the entry starts on a suggestion ("Profile 2") that the first typed
+// character or Backspace replaces. Keys: the letter and digit keys type, Backspace (or LB) deletes, Enter finishes, Esc cancels; an on-screen grid (9 columns of letters and digits,
+// then Space / Delete / OK) is for the pad and the mouse: the d-pad moves, Confirm presses the cell. This model is pure; the screen is Title_NameStep / Title_NameDraw.
+#macro NAME_GRID_COLS 9
+#macro NAME_GRID_ROWS 4   // rows of letters and digits; one more row holds the three buttons
+
+// The letters and digits of the grid, in order (built once).
+function NameEntry_Chars() {
+    if (!variable_global_exists("name_chars")) {
+        var t = "";
+        for (var i = 0; i < 26; i++) t += chr(65 + i);
+        for (var d = 0; d < 10; d++) t += string(d);
+        global.name_chars = t;
+    }
+    return global.name_chars;
+}
+
+function NameEntry_New(_text) {
+    return { text: string(_text), fresh: (string(_text) != ""), cx: 0, cy: 0 };
+}
+
+function NameEntry_CharOk(_ch) {
+    if (!is_string(_ch) || string_length(_ch) != 1) return false;
+    var o = ord(_ch);
+    return (o >= 65 && o <= 90) || (o >= 48 && o <= 57) || o == 32;
+}
+
+// Adds one character; false when it is not allowed (not a letter, digit or space, a space first or doubled, the name already full).
+function NameEntry_Type(_e, _ch) {
+    if (!NameEntry_CharOk(_ch)) return false;
+    if (_e.fresh) {
+        _e.text = "";
+        _e.fresh = false;
+    }
+    var n = string_length(_e.text);
+    if (n >= PROFILE_NAME_MAX) return false;
+    if (_ch == " " && (n == 0 || string_char_at(_e.text, n) == " ")) return false;
+    _e.text += _ch;
+    return true;
+}
+
+// Takes the last character away (the whole suggestion, while it is still the suggestion). false when there was nothing to take.
+function NameEntry_Backspace(_e) {
+    if (_e.fresh) {
+        _e.text = "";
+        _e.fresh = false;
+        return true;
+    }
+    var n = string_length(_e.text);
+    if (n <= 0) return false;
+    _e.text = string_delete(_e.text, n, 1);
+    return true;
+}
+
+// The name that would be made: trimmed, at most 12 characters (Profiles_CleanName).
+function NameEntry_Value(_e) {
+    return Profiles_CleanName(_e.text);
+}
+
+function NameEntry_CanConfirm(_e) {
+    return NameEntry_Value(_e) != "";
+}
+
+// The letter or digit of a grid cell ("" outside the letter rows).
+function NameEntry_CellChar(_cx, _cy) {
+    if (_cy < 0 || _cy >= NAME_GRID_ROWS || _cx < 0 || _cx >= NAME_GRID_COLS) return "";
+    return string_char_at(NameEntry_Chars(), _cy * NAME_GRID_COLS + _cx + 1);
+}
+
+// The last row's three buttons each take a third of the columns.
+function NameEntry_ButtonAt(_cx) {
+    var b = clamp(_cx div 3, 0, 2);
+    return (b == 0) ? "space" : ((b == 1) ? "delete" : "ok");
+}
+
+// The grid cursor moves and wraps (columns 0..8, rows 0..4).
+function NameEntry_Move(_e, _dx, _dy) {
+    _e.cx = (_e.cx + _dx + NAME_GRID_COLS) mod NAME_GRID_COLS;
+    _e.cy = (_e.cy + _dy + NAME_GRID_ROWS + 1) mod (NAME_GRID_ROWS + 1);
+}
+
+// What pressing the cell under the cursor does: { kind: "char" (ch), "space", "delete" or "ok", ch }.
+function NameEntry_Press(_e) {
+    if (_e.cy >= NAME_GRID_ROWS) return { kind: NameEntry_ButtonAt(_e.cx), ch: "" };
+    return { kind: "char", ch: NameEntry_CellChar(_e.cx, _e.cy) };
+}
+
+function Title_NameOf(_c) {
+    return (variable_instance_exists(_c, "title_name") && is_struct(_c.title_name)) ? _c.title_name : undefined;
+}
+
+// Opens the entry above the profile screen, on the suggestion "Profile N" (N = the id the new profile will get, plus one).
+function Title_NameOpen(_c) {
+    var pid = 0;
+    while (is_struct(Profiles_FindEntry(pid))) pid++;
+    _c.title_name = { e: NameEntry_New(Profiles_DefaultName(pid)), t: current_time, msg: false, rep: { v: Ui_RepeatNew(), h: Ui_RepeatNew() }, cells: [] };
+}
+
+// Makes the profile and switches to it (a new profile starts fresh: no Codex, no history, the story from the beginning); the entry and the profile screen close. An empty name
+// is refused with a line saying why. true when it made one.
+function Title_NameConfirm(_c) {
+    var n = Title_NameOf(_c);
+    if (!is_struct(n)) return false;
+    if (!NameEntry_CanConfirm(n.e)) {
+        n.msg = true;
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    var pid = Profiles_Create(NameEntry_Value(n.e));
+    if (pid < 0) {
+        n.msg = true;
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Profiles_Switch(pid);
+    _c.title_name = undefined;
+    _c.title_refresh = true;
+    _c.title_cursor_reset = true;
+    Ui_StackBack(_c.title_stk);   // the profile screen
+    SFX_PlayUI("ui_confirm");
+    return true;
+}
+
+// Esc: back to the profile screen, nothing made. The profile screen is told its press must not answer it.
+function Title_NameCancel(_c) {
+    _c.title_name = undefined;
+    var top = Ui_StackTop(_c.title_stk);
+    if (is_struct(top)) top.lock_ms = current_time;
+}
+
+// The character typed this frame by a key (letters through name_a..name_z, digits through the seed digits' keys, Space), "" when none. They are separate actions, so a
+// letter that is also a menu key (W A S D Q E Z X I) types its letter here.
+function Title_NameTyped() {
+    for (var i = 0; i < 26; i++) {
+        if (Input_Pressed("name_" + chr(97 + i))) return chr(65 + i);
+    }
+    for (var d = 0; d < 10; d++) {
+        if (Input_Pressed("seed_d" + string(d))) return string(d);
+    }
+    if (Input_Pressed("name_space")) return " ";
+    return "";
+}
+
+// One frame of the entry. A typed character wins over everything else that frame (Z, X, Space, W A S D Q are letters here, not Confirm, Back or moves); Enter finishes; Esc, Back
+// or a right click cancels; the grid answers the d-pad / arrows (moves), Confirm (presses) and the mouse (hover moves, click presses). The press that opened the entry is ignored.
+function Title_NameStep(_c) {
+    var n = _c.title_name;
+    var e = n.e;
+    var snap = Ui_ReadInput();
+    var now = current_time;
+    var typed = Title_NameTyped();
+    var changed = false;
+    if (typed != "") {
+        if (NameEntry_Type(e, typed)) changed = true;
+        else SFX_PlayUI("ui_deny");
+    } else {
+        if (Input_Pressed("seed_back") || snap.tab < 0) {
+            if (NameEntry_Backspace(e)) changed = true;
+        }
+        var dv = (snap.down ? 1 : 0) - (snap.up ? 1 : 0);
+        if (Ui_RepeatStep(n.rep.v, dv, snap.up_p || snap.down_p, now) > 0) { NameEntry_Move(e, 0, dv); changed = true; }
+        var dh = (snap.right ? 1 : 0) - (snap.left ? 1 : 0);
+        if (Ui_RepeatStep(n.rep.h, dh, snap.left_p || snap.right_p, now) > 0) { NameEntry_Move(e, dh, 0); changed = true; }
+        var hv = Ui_HoverIndex(n.cells, snap.mx, snap.my);
+        if (snap.mouse_moved && hv >= 0 && (n.cells[hv].cx != e.cx || n.cells[hv].cy != e.cy)) {
+            e.cx = n.cells[hv].cx;
+            e.cy = n.cells[hv].cy;
+            changed = true;
+        }
+    }
+    if (changed) {
+        n.msg = false;
+        SFX_PlayUI("ui_move");
+    }
+    if (now - n.t < UI_INPUT_LOCK_MS) return;
+    if (Input_Pressed("name_ok")) {
+        Title_NameConfirm(_c);
+        return;
+    }
+    if (typed != "") return;
+    if (snap.back || snap.rclick) {
+        SFX_PlayUI("ui_back");
+        Title_NameCancel(_c);
+        return;
+    }
+    var press = snap.confirm;
+    if (snap.click) {
+        var hc = Ui_HoverIndex(n.cells, snap.mx, snap.my);
+        if (hc >= 0) {
+            e.cx = n.cells[hc].cx;
+            e.cy = n.cells[hc].cy;
+            press = true;
+        }
+    }
+    if (!press) return;
+    var act = NameEntry_Press(e);
+    SFX_PlayUI("ui_confirm");
+    switch (act.kind) {
+        case "char":
+            if (NameEntry_Type(e, act.ch)) n.msg = false;
+            break;
+        case "space":
+            if (NameEntry_Type(e, " ")) n.msg = false;
+            break;
+        case "delete":
+            NameEntry_Backspace(e);
+            n.msg = false;
+            break;
+        case "ok":
+            Title_NameConfirm(_c);
+            break;
+    }
+}
+
+// The entry screen: a framed panel with the title, the name field (the suggestion pale, a block after typed text), a line of help (or why Confirm said no) and the grid (the
+// cursor's cell lit); the keys stand in a framed line in the lower left corner, as on the other title screens. Measured from Ui_Metrics, so it fits 480 x 432 and the larger
+// windows. The rectangles are kept in _c.title_name_rects for -shots.
+function Title_NameDraw(_c) {
+    var n = _c.title_name;
+    var e = n.e;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    var a = Ui_AnimT(n.t, current_time);
+    var cols = NAME_GRID_COLS;
+    var gap = p;
+    var cw0 = UI_TextWidth("W") + 4 * p;
+    var pw = min(mt.gw - 2 * mt.margin, max(cols * cw0 + (cols - 1) * gap + 12 * p, round(mt.gw * 0.7)));
+    var cw = floor((pw - 12 * p - (cols - 1) * gap) / cols);
+    var grid_w = cols * cw + (cols - 1) * gap;
+    var ch = lh + 2 * p;
+    var inner_w = pw - 8 * p;
+    var pad = (Prompt_Device() == "gamepad");   // a keyboard types (so its Space, Z, Q are letters here) and has no Pick key; a pad picks cells on the grid
+    var info = n.msg ? Loc_T("profile.name.need", "Enter a name.") : (pad ? Loc_T("profile.name.info_pad", "Up to 12 letters. Pick them on the grid.") : Loc_T("profile.name.info_kb", "Up to 12 letters. Backspace deletes, Enter finishes."));
+    var info_h = Ui_TextBlockH(info, inner_w);
+    var groups = pad ? [Loc_T("profile.name.hint_pick", "[k:confirm] Pick"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), Loc_T("profile.name.hint_cancel", "[k:back] Cancel")] : [Loc_T("profile.name.hint_cancel", "[k:back] Cancel")];
+    var hp = Title_HintPlanOf(groups);
+    var field_h = lh + 3 * p;
+    var ph = 4 * p + (lh + 3 * p) + 3 * p + field_h + 3 * p + info_h + 3 * p + (NAME_GRID_ROWS + 1) * (ch + gap) + 3 * p;
+    var px = round((mt.gw - pw) / 2);
+    var avail = hp.rect.y - 2 * mt.margin;
+    var py = mt.margin + max(0, round((avail - ph) / 2)) - p * round((1 - a) * 3);
+    Ui_DimBackdrop(UI_DIM_POPUP * a);
+    Ui_DrawFrame(px, py, pw, ph, a, p);
+    var a0 = draw_get_alpha();
+    draw_set_alpha(a);
+    var x0 = px + 4 * p;
+    var yy = py + 4 * p;
+    Ui_Text(x0, yy, Loc_T("profile.row.new", "New Profile"), UI_C_LIGHTEST);
+    Ui_Box(px + 3 * p, yy + lh + p, px + pw - 3 * p, yy + lh + 2 * p, UI_C_DARK);
+    yy += lh + 3 * p + 3 * p;
+    var field = { x: x0, y: yy, w: inner_w, h: field_h };
+    Ui_Box(field.x, field.y, field.x + field.w, field.y + field.h, UI_C_LIGHTEST);
+    Ui_Box(field.x + p, field.y + p, field.x + field.w - p, field.y + field.h - p, UI_C_DARKEST);
+    var shown = Ui_FitText(e.text, inner_w - 4 * p - UI_TextWidth("W"));
+    var ty = field.y + (field.h - lh) div 2;
+    Ui_Text(field.x + 2 * p, ty, shown, e.fresh ? UI_C_LIGHT : UI_C_LIGHTEST);
+    if (!e.fresh && string_length(e.text) < PROFILE_NAME_MAX && Title_BlinkOn(current_time - n.t)) {   // the block after typed text: where the next letter goes
+        var bx = field.x + 2 * p + UI_TextWidth(shown);
+        Ui_Box(bx + p, ty + lh - 2 * p, bx + p + UI_TextWidth("W") - p, ty + lh, UI_C_LIGHTEST);
+    }
+    yy += field_h + 3 * p;
+    Ui_TextBlock(x0, yy, info, inner_w, n.msg ? UI_C_LIGHTEST : UI_C_LIGHT);
+    yy += info_h + 3 * p;
+    var gx = px + round((pw - grid_w) / 2);
+    var cells = [];
+    for (var r = 0; r < NAME_GRID_ROWS; r++) {
+        for (var c = 0; c < cols; c++) {
+            var gcx = gx + c * (cw + gap);
+            var gcy = yy + r * (ch + gap);
+            var on = (e.cy == r && e.cx == c);
+            Ui_Box(gcx, gcy, gcx + cw, gcy + ch, on ? UI_C_LIGHTEST : UI_C_DARK);
+            Ui_Box(gcx + p, gcy + p, gcx + cw - p, gcy + ch - p, on ? UI_C_DARK : UI_C_DARKEST);
+            Ui_Text(gcx + cw / 2, gcy + (ch - lh) div 2, NameEntry_CellChar(c, r), UI_C_LIGHTEST, fa_center);
+            array_push(cells, { x: gcx, y: gcy, w: cw, h: ch, cx: c, cy: r });
+        }
+    }
+    var by = yy + NAME_GRID_ROWS * (ch + gap);
+    var bw = floor((grid_w - 2 * gap) / 3);
+    var blabels = [Loc_T("profile.name.key_space", "Space"), Loc_T("profile.name.key_delete", "Delete"), Loc_T("profile.name.key_ok", "OK")];
+    for (var b = 0; b < 3; b++) {
+        var bcx = gx + b * (bw + gap);
+        var bon = (e.cy == NAME_GRID_ROWS && NameEntry_ButtonAt(e.cx) == NameEntry_ButtonAt(b * 3));
+        Ui_Box(bcx, by, bcx + bw, by + ch, bon ? UI_C_LIGHTEST : UI_C_DARK);
+        Ui_Box(bcx + p, by + p, bcx + bw - p, by + ch - p, bon ? UI_C_DARK : UI_C_DARKEST);
+        Ui_Text(bcx + bw / 2, by + (ch - lh) div 2, Ui_FitText(blabels[b], bw - 2 * p), UI_C_LIGHTEST, fa_center);
+        array_push(cells, { x: bcx, y: by, w: bw, h: ch, cx: b * 3 + 1, cy: NAME_GRID_ROWS });
+    }
+    n.cells = cells;
+    draw_set_alpha(a0);
+    Title_DrawKeyPlan(hp, a);
+    _c.title_hint_rect = hp.rect;
+    _c.title_name_rects = { panel: { x: px, y: py, w: pw, h: ph }, field: field, cells: cells, hint: hp.rect };
+}
+
+// ---- D175: the profile screen (switch, create, delete) ----
+// A profile's numbers for its row: the active one from memory, any other from its own file (read, never applied). { runs, wins, best_floor }
+function Title_ProfileStats(_pid) {
+    var pr = (_pid == Profiles_Active()) ? Profile_Get() : Profile_Load(Profiles_PathOf(_pid)).profile;
+    return { runs: floor(Save_ToReal(pr.runs_started, 0)), wins: floor(Save_ToReal(pr.wins, 0)), best_floor: floor(Save_ToReal(pr.best_floor, 0)) };
+}
+
+// One row per profile (name; "Active" on the one in use; Runs / Wins / Best Floor in the details) and a "New Profile" row while there are fewer than PROFILES_MAX.
+function Title_ProfileRows() {
+    var list = Profiles_List();
+    var act = Profiles_Active();
+    var rows = [];
+    for (var i = 0; i < array_length(list); i++) {
+        var st = Title_ProfileStats(list[i].id);
+        array_push(rows, {
+            id: "prof_" + string(list[i].id), pid: list[i].id, label: list[i].name, value: (list[i].id == act) ? Loc_T("profile.val.active", "Active") : "",
+            status: "profile", kind: "button", enabled: true, dim: false, hint: "",
+            help: (list[i].id == act) ? Loc_T("profile.help.active", "The profile in use. Its Codex, run history and story are the ones you see.") : Loc_T("profile.help.other", "Switch to this profile. Its Codex, run history, story and save files come with it."),
+            lines: [
+                { label: Loc_T("profile.lbl.runs", "Runs"), value: string(st.runs) },
+                { label: Loc_T("tab.lbl.wins", "Wins"), value: string(st.wins) },
+                { label: Loc_T("tab.lbl.best_floor", "Best Floor"), value: string(st.best_floor) }
+            ]
+        });
+    }
+    if (array_length(list) < PROFILES_MAX) {
+        array_push(rows, {
+            id: "prof_new", pid: -1, label: Loc_T("profile.row.new", "New Profile"), value: "", status: "new", kind: "button", enabled: true, dim: false, hint: "",
+            help: Loc_T("profile.help.new", "Start a new profile. Its Codex and run history are empty and the story begins again."), lines: []
+        });
+    }
+    return rows;
+}
+
+// The row of the active profile (where the cursor starts).
+function Title_ProfileActiveRow(_rows) {
+    for (var i = 0; i < array_length(_rows); i++) if (_rows[i].pid == Profiles_Active()) return i;
+    return 0;
+}
+
+function Title_ProfileOpen(_c) {
+    var rows = Title_ProfileRows();
+    var m = Ui_MenuNew("profiles", rows, {
+        owner: _c, on_confirm: Title_ProfileConfirm, data: { mode: "profiles" },
+        layout: { title: Loc_T("profile.title", "Profiles"), anchor: "center", details: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, Title_ProfileActiveRow(rows));
+    Ui_StackPush(_c.title_stk, m);
+    return m;
+}
+
+// Confirm: New Profile opens the name entry; another profile becomes the active one (the title refreshes: its name, what Continue and Load Game can do) and the screen closes.
+function Title_ProfileConfirm(_m, _i) {
+    var c = _m.owner;
+    var row = _m.items[_i];
+    if (row.pid < 0) {
+        Title_NameOpen(c);
+        return;
+    }
+    if (row.pid != Profiles_Active()) {
+        Profiles_Switch(row.pid);
+        c.title_cursor_reset = true;
+    }
+    c.title_refresh = true;
+    Ui_StackBack(c.title_stk);
+}
+
+// The delete key on a profile row: asks Yes / No. New Profile has nothing to delete. Returns true when it asked.
+function Title_ProfileDeleteAsk(_c, _m) {
+    if (!is_struct(_m) || _m.id != "profiles" || array_length(_m.items) <= 0) return false;
+    var row = _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)];
+    if (row.pid < 0) {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Confirm_Open(Loc_T("profile.delete.ask", "Delete profile {name}? Its Codex, history and save files are lost.", { name: row.label }), Title_ProfileDeleteYes, { c: _c, m: _m, pid: row.pid });
+    return true;
+}
+
+// Yes: the profile and its three save files go (deleting the active one makes the first remaining one active, the last one a fresh "Profile 1": the data layer's rules).
+function Title_ProfileDeleteYes(_d) {
+    Profiles_Delete(_d.pid);
+    _d.c.title_refresh = true;
+    _d.c.title_cursor_reset = true;
+    var rows = Title_ProfileRows();
+    _d.m.items = rows;
+    Ui_MenuFixCursor(_d.m, Title_ProfileActiveRow(rows));
+}
+
+// ---- D175: the Codex and Run History from the title ----
+// The Codex pages of the ACTIVE profile (Bestiary, Notes, Run History, Unlocks), read-only, with the Tab menu's own rows, pages and layout (TabCodex_Items / TabCodex_Page /
+// TabMenu_FitMenu). A found note does not open its reader here (the reader can answer a note's question, which would write to the profile). Back goes up one level; Back at the
+// list closes the screen. c.title_codex = { stk, t } while it is open.
+function Title_CodexOf(_c) {
+    return (variable_instance_exists(_c, "title_codex") && is_struct(_c.title_codex)) ? _c.title_codex : undefined;
+}
+
+function Title_CodexOpen(_c) {
+    var stk = Ui_StackNew();
+    var m = Ui_MenuNew("title_codex", TabCodex_Items(Profile_Get()), {
+        owner: _c, on_confirm: Title_CodexOnConfirm, on_back: Title_CodexOnBack, data: { tab: "title_codex" },
+        layout: { title: Loc_T("tab.title.codex", "Codex"), anchor: "center", details: true, details_pos: "right", det_art: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(stk, m);
+    _c.title_codex = { stk: stk, t: current_time };
+}
+
+function Title_CodexOnConfirm(_m, _i) {
+    Title_CodexPage(_m.owner, _m.items[_i].id);
+}
+
+// Opens one page ("bestiary", "notes", "history", "unlocks") above the list; false when it has no rows (Run History before the first run).
+function Title_CodexPage(_c, _kind) {
+    var cx = Title_CodexOf(_c);
+    if (!is_struct(cx)) return false;
+    var page = TabCodex_Page(_kind, Profile_Get());
+    if (array_length(page.rows) <= 0) return false;
+    var m = TabCodex_MakeMenu(_kind, page);
+    m.owner = _c;
+    Ui_MenuFixCursor(m, m.cursor);
+    Ui_StackPush(cx.stk, m);
+    return true;
+}
+
+function Title_CodexOnBack(_m, _res) {
+    if (_res == "root") Title_CodexClose(_m.owner);
+}
+
+function Title_CodexClose(_c) {
+    _c.title_codex = undefined;
+    _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
+    if (is_struct(_c.title_stk) && array_length(_c.title_stk.menus) > 0) _c.title_stk.menus[0].lock_ms = current_time;   // the press that closed it must not answer the title
+}
+
+function Title_CodexStep(_c) {
+    var cx = Title_CodexOf(_c);
+    Ui_MenuUpdate(Ui_StackTop(cx.stk), cx.stk);
+}
+
+// The screen: the dimmed picture, the list or page (fitted into the whole body, as the Tab menu fits it), and the keys in the title's framed line at the lower left.
+function Title_CodexDraw(_c) {
+    var cx = Title_CodexOf(_c);
+    var stk = cx.stk;
+    var now = current_time;
+    var a = Ui_AnimT(cx.t, now);
+    var top = Ui_StackTop(stk);
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var row = (array_length(top.items) > 0) ? top.items[clamp(top.cursor, 0, array_length(top.items) - 1)] : undefined;
+    var groups = [];
+    if (is_struct(row) && variable_struct_exists(row, "hint") && row.hint != "") array_push(groups, row.hint);
+    array_push(groups, (Ui_StackDepth(stk) > 1) ? Loc_T("tab.hint.back", "[k:back] Back") : Loc_T("tab.hint.close", "[k:back] Close"));
+    var hp = Title_HintPlanOf(groups);
+    var z = TabMenu_Zones((string_pos("codex_", top.id) == 1) ? top.id : "codex");
+    z.body_y = z.tabs_y;   // no tabs header here: the body starts at the top margin and ends above the key line
+    z.body_h = hp.rect.y - mt.margin - z.body_y;
+    Ui_DimBackdrop(UI_DIM_SCREEN * a);
+    if (is_struct(stk.leaving) && Ui_MenuAlpha(stk.leaving, now) <= 0) stk.leaving = undefined;
+    TabMenu_FitMenu(top, z, 0);
+    Ui_MenuDraw(top, a * Ui_MenuAlpha(top, now));
+    if (is_struct(stk.leaving)) {
+        TabMenu_FitMenu(stk.leaving, z, 0);
+        Ui_MenuDraw(stk.leaving, a * Ui_MenuAlpha(stk.leaving, now));
+    }
+    Title_DrawKeyPlan(hp, a);
+    _c.title_hint_rect = hp.rect;
+    draw_set_alpha(1);
+}
+
+// Which corner button a point is on ("profile", "codex" or ""), from the rectangles the draw keeps in title_btn; the right and bottom edges are outside, a button that was not
+// drawn (width 0) is never hit.
+function Title_ButtonHit(_c, _x, _y) {
+    var names = ["profile", "codex"];
+    for (var i = 0; i < array_length(names); i++) {
+        var r = variable_struct_get(_c.title_btn, names[i]);
+        if (r.w > 0 && _x >= r.x && _x < r.x + r.w && _y >= r.y && _y < r.y + r.h) return names[i];
+    }
+    return "";
+}
+
+// ---- D175: the corner buttons of the title ----
+// Two small framed buttons in the lower left corner, one above the other, clear of the menu column (the name is cut to the room beside it) and of the build id in the lower
+// right: Profile (its key "[Q]", the active profile's name under it) and Codex above it (its key "[E]"). A click or the key opens the profile screen / the Codex. The rectangles are
+// kept in _c.title_btn for the mouse and -shots.
+function Title_DrawButtons(_c) {
+    _c.title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } };
+    var m = _c.title_stk.menus[0];
+    var a = Ui_MenuAlpha(m, current_time);
+    if (a <= 0 || m.rect.w <= 0) return;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var lh = mt.line_h;
+    var mp = Ui_MousePos();
+    var plabel = Loc_T("profile.btn", "[k:tab_prev] Profile");
+    var clabel = Loc_T("codex.btn", "[k:tab_next] Codex");
+    var room_w = max(12 * p, m.rect.x - 2 * mt.margin - 8 * p);
+    var name = Ui_FitText(Profiles_ActiveName(), room_w);
+    var pw = max(Prompt_RichLayout(plabel, 100000).line_w[0], UI_TextWidth(name)) + 8 * p;
+    var ph = 2 * lh + p + 8 * p;
+    var px = mt.margin;
+    var py = mt.gh - mt.margin - ph;
+    var cw = Prompt_RichLayout(clabel, 100000).line_w[0] + 8 * p;
+    var chh = lh + 8 * p;
+    var cx = mt.margin;
+    var cy = py - p * 2 - chh;
+    _c.title_btn = { profile: { x: px, y: py, w: pw, h: ph }, codex: { x: cx, y: cy, w: cw, h: chh } };
+    var hot = Title_ButtonHit(_c, mp.x, mp.y);
+    var a0 = draw_get_alpha();
+    Ui_DrawFrame(px, py, pw, ph, a, p);
+    Ui_DrawFrame(cx, cy, cw, chh, a, p);
+    draw_set_alpha(a);
+    if (hot == "profile") Ui_Box(px + 2 * p, py + 2 * p, px + pw - 2 * p, py + ph - 2 * p, UI_C_DARK);
+    if (hot == "codex") Ui_Box(cx + 2 * p, cy + 2 * p, cx + cw - 2 * p, cy + chh - 2 * p, UI_C_DARK);
+    Prompt_RichDraw(px + 4 * p, py + 4 * p, plabel, pw - 8 * p, UI_C_LIGHT, fa_left, a);
+    Ui_Text(px + 4 * p, py + 4 * p + lh + p, name, UI_C_LIGHTEST);
+    Prompt_RichDraw(cx + 4 * p, cy + 4 * p, clabel, cw - 8 * p, UI_C_LIGHT, fa_left, a);
+    draw_set_alpha(a0);
+}
+
+// The title's own keys: the Profile button's key (Q, the pad's LB), the Codex button's key (E, RB) or a click on either button. Only on the title menu itself, once it takes input.
+// True when one was used.
+function Title_ButtonKeys(_c) {
+    var m = _c.title_stk.menus[0];
+    if (current_time - m.lock_ms < UI_INPUT_LOCK_MS || Ui_MenuAlpha(m, current_time) < 1) return false;
+    var which = "";
+    if (Input_Pressed("tab_prev")) which = "profile";
+    else if (Input_Pressed("tab_next")) which = "codex";
+    else if (mouse_check_button_pressed(mb_left)) {
+        var mp = Ui_MousePos();
+        which = Title_ButtonHit(_c, mp.x, mp.y);
+    }
+    if (which == "") return false;
+    SFX_PlayUI("ui_confirm");
+    if (which == "profile") Title_ProfileOpen(_c);
+    else Title_CodexOpen(_c);
+    return true;
 }
 
 // ---- D152: the seed pick after New Game ----
@@ -3453,8 +4274,16 @@ function Title_SeedChoiceConfirm(_m, _i) {
     Title_NewGameGo(c);
 }
 
-// The title fades out; Title_Step starts the run when the fade is over.
+// The title fades out; Title_Step starts the run when the fade is over. D175: this is where the save file is committed: the chosen one is emptied first when the
+// overwrite picker asked for it (the run in it counts as abandoned), then it becomes the active file the run saves to.
 function Title_NewGameGo(_c) {
+    var slot = variable_instance_exists(_c, "title_new_slot") ? _c.title_new_slot : -1;
+    if (slot >= 0) {
+        if (variable_instance_exists(_c, "title_new_wipe") && _c.title_new_wipe) Slot_Delete(Profiles_Active(), slot);
+        Slot_SetActive(slot);
+    }
+    _c.title_new_slot = -1;
+    _c.title_new_wipe = false;
     _c.title_exit = { at: current_time + UI_PANEL_MS };
     for (var i = 0; i < array_length(_c.title_stk.menus); i++) Ui_MenuClose(_c.title_stk.menus[i]);
 }
@@ -3611,17 +4440,44 @@ function Title_Step(_c) {
         Title_SeedEntryStep(_c);
         return;
     }
+    if (is_struct(Title_NameOf(_c))) {   // D175: the name entry is above the profile screen
+        Title_NameStep(_c);
+        return;
+    }
+    if (is_struct(Title_CodexOf(_c))) {   // D175: the Codex of the active profile
+        Title_CodexStep(_c);
+        return;
+    }
     if (_c.title_refresh) Title_Refresh(_c);
-    Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
+    if (Ui_StackDepth(_c.title_stk) == 1 && Title_ButtonKeys(_c)) return;   // D175: the profile button's key, or a click on it
+    var top = Ui_StackTop(_c.title_stk);
+    if (Title_PickerKeys(_c, top)) return;   // D175: the delete key on a Load Game row
+    var depth0 = Ui_StackDepth(_c.title_stk);
+    Ui_MenuUpdate(top, _c.title_stk);
+    if (depth0 > 1 && Ui_StackDepth(_c.title_stk) == 1) _c.title_refresh = true;   // back on the title: save files may have changed (a delete)
 }
 
 function Title_Draw(_c) {
     if (!is_struct(_c.title_stk) || _c.state == "settings") return;
     if (is_struct(Title_SeedEntryOf(_c))) {   // D152: the entry screen stands alone over the dimmed picture
         Title_SeedEntryDraw(_c);
+    } else if (is_struct(Title_NameOf(_c))) {   // D175: so does the name entry
+        Title_NameDraw(_c);
+    } else if (is_struct(Title_CodexOf(_c))) {   // D175: and the Codex
+        Title_CodexDraw(_c);
     } else {
+        var pk = (Ui_StackDepth(_c.title_stk) >= 2 && Title_IsPicker(_c.title_stk.menus[1])) ? _c.title_stk.menus[1] : undefined;
+        if (is_struct(pk)) {   // D175: a save file picker stands alone over the dimmed picture (the title menu is not drawn under it), clear of its key line
+            if (Ui_StackTop(_c.title_stk) == pk) Title_PickerFit(_c, pk);
+            Ui_DimBackdrop(UI_DIM_POPUP * Ui_MenuAlpha(pk, current_time));
+        }
         Ui_StackDraw(_c.title_stk);
-        if (Ui_StackDepth(_c.title_stk) <= 1) Title_DrawCard(_c);   // the Continue card makes way for the seed pick
+        if (Ui_StackDepth(_c.title_stk) <= 1) {
+            Title_DrawCard(_c);   // the Continue card makes way for the seed pick
+            Title_DrawButtons(_c);   // D175: the profile button
+        } else {
+            Title_DrawHints(_c);   // D175: the keys of a save file picker or of the profile screen
+        }
     }
     draw_set_alpha(1);
     draw_set_color(c_white);

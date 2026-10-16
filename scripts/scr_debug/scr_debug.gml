@@ -265,7 +265,7 @@ function Scenario_Boot() {
     global.tutorial_off = true;   // C4 (D45): the scripted runs see no first-time pop-ups unless a step switches them on
     global.choice_off = true;   // D154: nor the small flavour questions (the Stranger, the merchant, a note, the wake line) unless a step switches them on
     global.scn = { mode: _mode, f: 0, t: 0, step: 0, pass: 0, fail: 0, errors: 0, done: false, tap_action: "", last_tap: -100, v: 0, ri: 0, si: 0,
-                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 31000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 36000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
+                   cap: (_mode == "bot") ? 22000 : ((_mode == "shots") ? 40000 : ((_mode == "gridshots") ? 8000 : ((_mode == "smoke") ? 44000 : 9000))), vstart: 0, hits: 0, tries: 0, attacking: false, qlog: [], qbase: 0, qhitstop: false, exp0: 0, shot: "", sk: 0, sk_start: 0, sk_fx: false, sk_fx_on_player: false, sk_fx_on_enemy: false, sk_fx_px: 0, sk_fx_limit: 0, sk_fx_min: 0, sk_cast: false, sk_flash: false, sk_mp0: 0, ski: 0, xi: 0, xwrong: 0, fxi: 0, di: 0, ap0: 0, fin_f: 0, cut_shot: false, fade_shot: false, dlg_seen: false, dlg_t: 0, mp: 0, mv: {}, holds: [], wd: undefined, boost: undefined };
 }
 
 function Scenario_Finish() {
@@ -553,7 +553,11 @@ function Scenario_StepSmoke(_s) {
             break;
         case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
         case 1060: case 1061: case 1062: case 1063: case 1064: case 1065: case 1066: case 1067: case 1068: case 1069:
-            Scenario_StepSmokeR3Stealth(_s);   // r3stealth (D179, R-098, R-099): a slime spots the player and loses him (it stands and searches 3 s, one ?, home in 7 s), 2 s of ignoring, hiding in a bush; the end of the chain (its last step calls Scenario_NoticeEnd)
+            Scenario_StepSmokeR3Stealth(_s);   // r3stealth (D179, R-098, R-099): a slime spots the player and loses him (it stands and searches 3 s, one ?, home in 7 s), 2 s of ignoring, hiding in a bush; goes on with saves2 (1070) (its last step calls Scenario_NoticeEnd)
+            break;
+        case 1070: case 1071: case 1072: case 1073: case 1074: case 1075: case 1076: case 1077: case 1078: case 1079:
+        case 1080: case 1081: case 1082: case 1083: case 1084: case 1085: case 1086: case 1087: case 1088: case 1089:
+            Scenario_StepSmokeR3Saves2(_s);   // saves2 (D175, R-107): the title with profiles and three save files through real keys; the end of the chain (its last step calls Scenario_NoticeEnd)
             break;
         case 410: case 411: case 412: case 413: case 414: case 415: case 416: case 417: case 418: case 419:
             Scenario_StepSmokeSpeed(_s);   // g7 (D134, D135): hold run in a battle (2x, never the bars), the damage preview; its last step goes on to G6 (380)
@@ -645,19 +649,19 @@ function Scenario_StepSmokeUi(_s) {
     switch (_s.t) {
         case 1:
             Scenario_Check("ui_title_menu_is_on_the_framework", is_struct(_top) && _top.id == "title" && Ui_StackDepth(_c.title_stk) == 1);
-            Scenario_Check("ui_title_starts_on_the_first_item", is_struct(_top) && _top.cursor == 0);
+            Scenario_Check("ui_title_starts_on_the_first_item", is_struct(_top) && _top.cursor == 1 && _top.items[_top.cursor].id == "new");   // D175: Continue is the first row but greyed with nothing saved, so the cursor starts on New Game
             Scenario_Tap("menu_up");
             break;
         case 4:
-            Scenario_Check("ui_up_from_the_first_item_lands_on_the_last", _top.cursor == 3, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_up_from_the_first_item_lands_on_the_last", _top.cursor == 4, "cursor=" + string(_top.cursor));
             Scenario_Tap("menu_down");
             break;
         case 10:
-            Scenario_Check("ui_down_from_the_last_item_wraps_to_the_first", _top.cursor == 0, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_down_from_the_last_item_wraps_to_the_first", _top.cursor == 1, "cursor=" + string(_top.cursor));   // the first row you can use: New Game (Continue is greyed)
             Scenario_Tap("menu_down");
             break;
         case 16:
-            Scenario_Check("ui_cursor_skips_the_greyed_load_game", _top.cursor == 2, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_cursor_skips_the_greyed_load_game", _top.cursor == 3, "cursor=" + string(_top.cursor));
             Scenario_Tap("confirm");
             break;
         case 22:
@@ -683,14 +687,14 @@ function Scenario_StepSmokeUi(_s) {
             Scenario_Check("ui_back_keeps_the_change", abs(GameSettings_Ensure().audio_ui - 0.95) < 0.001);
             Settings_Change("vol_ui", 1);   // put it back for the steps after this one
             Scenario_Check("ui_the_volume_is_back_at_100", abs(GameSettings_Ensure().audio_ui - 1) < 0.001);
-            Scenario_Check("ui_title_cursor_is_remembered", is_struct(_top) && _top.cursor == 2, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_title_cursor_is_remembered", is_struct(_top) && _top.cursor == 3, "cursor=" + string(_top.cursor));
             Scenario_Tap("menu_down");
             break;
         case 66:
             Scenario_Tap("menu_down");
             break;
         case 72:
-            Scenario_Check("ui_title_cursor_back_on_new_game", _top.cursor == 0, "cursor=" + string(_top.cursor));
+            Scenario_Check("ui_title_cursor_back_on_new_game", _top.cursor == 1, "cursor=" + string(_top.cursor));
             break;
         case 80:
             Scenario_Tap("cancel");   // D35: no difficulty level; Back on the title root is the next thing to check
@@ -732,7 +736,7 @@ function Scenario_StepSmokeUiStart(_s) {
     switch (_s.t) {
         case 1:
             _s.diff_menu_seen = false;
-            Ui_MenuFixCursor(Ui_StackTop(_c.title_stk), 0);   // the hold left the cursor anywhere
+            Ui_MenuFixCursor(Ui_StackTop(_c.title_stk), 1);   // the hold left the cursor anywhere: New Game (D175: row 1, Continue is row 0)
             Difficulty_SetCurrent(DIFFICULTY_HARD);   // a stale value: New Game must start on Normal, not keep it
             Scenario_Tap("confirm");
             break;
@@ -833,54 +837,45 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                 Scenario_Next(_s, 221);
             }
             break;
-        case 221:
+        case 221:   // D175: with a run in save 1 the cursor starts on Continue; New Game takes the next empty save file and asks nothing; the saved run stays
             switch (_s.t) {
                 case 3:
-                    Scenario_Check("newgame_guard_cursor_starts_on_continue_when_a_run_is_saved", is_struct(_m) && _m.cursor == 1 && _m.items[1].enabled, "cursor=" + (is_struct(_m) ? string(_m.cursor) : "no menu"));
+                    Scenario_Check("newgame_guard_cursor_starts_on_continue_when_a_run_is_saved", is_struct(_m) && _m.cursor == 0 && _m.items[0].enabled && _m.items[0].id == "continue", "cursor=" + (is_struct(_m) ? string(_m.cursor) : "no menu"));
                     Scenario_Tap("menu_up");
                     break;
                 case 9:
-                    Scenario_Check("newgame_guard_up_from_continue_is_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    Scenario_Check("newgame_guard_up_from_continue_wraps_to_quit", _m.cursor == 4, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
                     break;
-                case 40:
-                    Scenario_Tap("confirm");   // the first press on New Game
+                case 15:
+                    Scenario_Check("newgame_guard_down_is_continue_again", _m.cursor == 0, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
                     break;
-                case 48:
-                    Scenario_Check("newgame_guard_first_confirm_keeps_the_run_save", RunSave_HasSave());
-                    Scenario_Check("newgame_guard_first_confirm_opens_the_popup", Confirm_IsOpen() && Confirm_Question() == "Start a new game? The saved run will be abandoned.", "open=" + string(Confirm_IsOpen()));
-                    Scenario_Check("newgame_guard_popup_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
-                    Scenario_Check("newgame_guard_first_confirm_does_not_start_a_game", room == rm_start && _sc != noone && !is_struct(_sc.title_exit) && _sc.state == "main");
-                    Scenario_Check("newgame_guard_the_row_still_says_new_game", _m.items[0].label == _plain, "label=" + string(_m.items[0].label));
-                    Scenario_Tap("confirm");   // No
+                case 21:
+                    Scenario_Check("newgame_guard_down_reaches_new_game", _m.cursor == 1 && _m.items[1].id == "new", "cursor=" + string(_m.cursor));
+                    Scenario_Tap("confirm");   // New Game with a run saved in save 1
                     break;
-                case 56:
-                    Scenario_Check("newgame_guard_no_closes_the_popup", !Confirm_IsOpen() && _m.cursor == 0 && _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "cursor=" + string(_m.cursor));
-                    Scenario_Tap("confirm");   // ask again
+                case 32:
+                    Scenario_Check("newgame_guard_new_game_asks_no_question_while_a_save_file_is_empty", !Confirm_IsOpen());
+                    Scenario_Check("newgame_guard_new_game_keeps_the_run_save", RunSave_HasSave());
+                    Scenario_Check("newgame_guard_new_game_asks_for_a_seed", _sc != noone && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit), "room=" + room_get_name(room));   // D152
+                    Scenario_Check("newgame_guard_the_row_still_says_new_game", _m.items[1].label == _plain, "label=" + string(_m.items[1].label));
+                    Scenario_Tap("cancel");   // Back from the seed pick leaves the title as it was
                     break;
-                case 64:
-                    Scenario_Check("newgame_guard_asks_again_after_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1 && RunSave_HasSave());
-                    Scenario_Tap("cancel");   // Back is No
+                case 44:
+                    Scenario_Check("newgame_guard_back_closes_the_seed_pick", _sc.state == "main" && Ui_StackDepth(_sc.title_stk) == 1 && !is_struct(_sc.title_exit) && RunSave_HasSave(), "depth=" + string(Ui_StackDepth(_sc.title_stk)));
+                    Scenario_Tap("confirm");   // New Game again
                     break;
-                case 72:
-                    Scenario_Check("newgame_guard_back_closes_the_popup", !Confirm_IsOpen() && _m.items[0].label == _plain && RunSave_HasSave() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit), "label=" + string(_m.items[0].label));
-                    Scenario_Tap("confirm");   // ask once more
+                case 60:
+                    Scenario_Check("newgame_guard_the_seed_pick_is_open_again", Ui_StackTop(_sc.title_stk).id == "seed_choice");
                     break;
-                case 80:
-                    Scenario_Check("newgame_guard_asks_once_more", Confirm_IsOpen() && RunSave_HasSave());
-                    Scenario_Tap("menu_up");   // No -> Yes
-                    break;
-                case 88:
-                    Scenario_Check("newgame_guard_up_reaches_yes", Confirm_IsOpen() && Confirm_Menu().cursor == 0 && RunSave_HasSave() && !is_struct(_sc.title_exit));
-                    Scenario_Tap("confirm");   // Yes starts the new run
-                    break;
-                case 94:
-                    Scenario_Check("newgame_guard_yes_asks_for_a_seed", _sc != noone && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice" && !is_struct(_sc.title_exit) && RunSave_HasSave(), "room=" + room_get_name(room));   // D152 after D156: New Game -> pop-up (a run is saved) -> seed pick
-                    break;
-                case 108:
+                case 70:
                     Scenario_Tap("confirm");   // D152: Random seed, the first row
                     break;
-                case 116:
-                    Scenario_Check("newgame_guard_yes_then_the_seed_pick_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
+                case 78:
+                    Scenario_Check("newgame_guard_the_seed_pick_starts_a_new_run", (_sc != noone && is_struct(_sc.title_exit)) || room != rm_start || Transition_IsActive(), "room=" + room_get_name(room));
+                    Scenario_Check("newgame_guard_the_new_run_goes_into_save_2", Slot_Active() == 1, "slot=" + string(Slot_Active()));
+                    Scenario_Check("newgame_guard_save_1_is_untouched", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)) && RunSave_LoadFrom(Slots_PathOf(Profiles_Active(), 0)).run.seed == 4242);
                     _s.ng_held = false;
                     Scenario_Next(_s, 222);
                     break;
@@ -897,6 +892,8 @@ function Scenario_StepSmokeNewGameGuard(_s) {
                     if ((_s.f - _s.last_tap) >= 8) Scenario_Tap("confirm");
                 } else if (_s.t > 60 && array_length(_gs.ui.lines) <= 0 && variable_struct_exists(_gs, "pending_floor1_intro_dialogue") && !_gs.pending_floor1_intro_dialogue) {
                     Scenario_Check("newgame_guard_new_run_is_not_the_saved_one", Run_IsActive() && _gs.run.seed != 4242, "seed=" + (Run_IsActive() ? string(_gs.run.seed) : "no run"));
+                    for (var _gs_i = 0; _gs_i < PROFILE_SLOTS; _gs_i++) Save_DeleteFileSet(Slots_PathOf(Profiles_Active(), _gs_i));   // D175: the files of this step go, and save 1 is the active file again, as the steps after it expect
+                    Slot_SetActive(0);
                     Scenario_Next(_s, 1);
                 }
             }
@@ -961,7 +958,7 @@ function Scenario_StepSmokeTitle(_s) {
         case 273:   // slid in; the cursor on Continue; the card shows the saved run
             if (is_struct(_m) && Ui_MenuAlpha(_m, current_time) >= 1) {
                 Scenario_Check("title_menu_has_slid_in", current_time - _m.opened_ms >= UI_PANEL_MS);
-                Scenario_Check("title_cursor_starts_on_continue_with_a_run_saved", _m.cursor == 1 && _m.items[1].enabled, "cursor=" + string(_m.cursor));
+                Scenario_Check("title_cursor_starts_on_continue_with_a_run_saved", _m.cursor == 0 && _m.items[0].enabled && _m.items[0].id == "continue", "cursor=" + string(_m.cursor));   // D175: Continue is the first row
                 var _ct = Title_CardText(_sc.title_card);
                 Scenario_Check("title_card_shows_the_saved_run", _sc.title_card.kind == "run");
                 Scenario_Check("title_card_class_is_the_saved_class", _ct.title == Loc_T("class.name.class_archer", "Archer"), "title=" + string(_ct.title));
@@ -971,49 +968,43 @@ function Scenario_StepSmokeTitle(_s) {
             }
             if (_s.t > 120) { Scenario_Check("title_menu_slides_in", false, "alpha=" + (is_struct(_m) ? string(Ui_MenuAlpha(_m, current_time)) : "no menu")); Scenario_NoticeEnd(); }
             break;
-        case 274:   // wrap-around through real keys: Continue -> New Game -> (up) Exit Game -> (down) New Game -> Continue
+        case 274:   // wrap-around through real keys (D175: Continue, New Game, Load Game, Settings, Quit): Continue -> (up) Quit -> (down) Continue -> New Game
             switch (_s.t) {
                 case 3: Scenario_Tap("menu_up"); break;
                 case 9:
-                    Scenario_Check("title_up_from_continue_is_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
-                    Scenario_Tap("menu_up");
+                    Scenario_Check("title_up_from_continue_wraps_to_exit", _m.cursor == 4, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("menu_down");
                     break;
                 case 15:
-                    Scenario_Check("title_up_from_the_first_item_wraps_to_exit", _m.cursor == 3, "cursor=" + string(_m.cursor));
+                    Scenario_Check("title_down_from_the_last_item_wraps_to_continue", _m.cursor == 0, "cursor=" + string(_m.cursor));
                     Scenario_Tap("menu_down");
                     break;
                 case 21:
-                    Scenario_Check("title_down_from_the_last_item_wraps_to_new_game", _m.cursor == 0, "cursor=" + string(_m.cursor));
-                    Scenario_Tap("menu_down");
-                    break;
-                case 27:
-                    Scenario_Check("title_down_from_new_game_is_continue", _m.cursor == 1, "cursor=" + string(_m.cursor));
-                    Scenario_Tap("menu_up");
+                    Scenario_Check("title_down_from_continue_is_new_game", _m.cursor == 1, "cursor=" + string(_m.cursor));
+                    Scenario_Tap("confirm");   // D175: New Game with a run saved asks nothing: the next empty save file takes it, the seed pick opens
                     break;
                 case 33:
-                    Scenario_Check("title_back_on_new_game", _m.cursor == 0 && _sc.state == "main");
-                    Scenario_Tap("confirm");   // the first press on New Game with a run saved only asks
-                    break;
-                case 39:
-                    Scenario_Check("title_new_game_asks_first", Confirm_IsOpen() && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit), "open=" + string(Confirm_IsOpen()));
-                    Scenario_Check("title_card_stays_while_the_guard_asks", _sc.title_card.kind == "run");
+                    Scenario_Check("title_new_game_goes_to_the_seed_pick_without_a_question", !Confirm_IsOpen() && RunSave_HasSave() && room == rm_start && !is_struct(_sc.title_exit) && Ui_StackTop(_sc.title_stk).id == "seed_choice", "open=" + string(Confirm_IsOpen()));
+                    Scenario_Check("title_card_model_stays_while_the_seed_pick_is_open", _sc.title_card.kind == "run");
                     Scenario_Tap("cancel");
                     break;
                 case 45:
-                    Scenario_Check("title_back_closes_the_new_game_question", !Confirm_IsOpen() && _m.items[0].label == _plain && RunSave_HasSave(), "label=" + string(_m.items[0].label));
+                    Scenario_Check("title_back_closes_the_seed_pick", Ui_StackDepth(_sc.title_stk) == 1 && _m.items[1].label == _plain && RunSave_HasSave(), "label=" + string(_m.items[1].label));
                     RunSave_Delete();
                     Test_RawWrite(RunSave_Path(), "{{ not json");   // a damaged save: the card says so
                     _sc.title_refresh = true;
                     break;
                 case 50:
                     Scenario_Check("title_a_damaged_save_shows_cant_continue", _sc.title_card.kind == "cant" && Title_CardText(_sc.title_card).title == Loc_T("title.card.cant", "Can't Continue"), "kind=" + string(_sc.title_card.kind));
-                    Scenario_Check("title_the_continue_row_stays_selectable_for_the_notice", _m.items[1].enabled);
+                    Scenario_Check("title_the_continue_row_stays_selectable_for_the_notice", _m.items[0].enabled);
                     RunSave_Delete();
                     _sc.title_refresh = true;
                     break;
                 case 56:
                     Scenario_Check("title_no_save_no_card", _sc.title_card.kind == "none");
-                    Scenario_Check("title_no_save_greys_continue", !_m.items[1].enabled);
+                    Scenario_Check("title_no_save_greys_continue", !_m.items[0].enabled);
+                    Scenario_Check("title_no_save_greys_load_game", !_m.items[2].enabled);
+                    Scenario_Check("title_no_save_puts_the_cursor_on_new_game", _m.cursor == 1, "cursor=" + string(_m.cursor));
                     Scenario_Next(_s, 275);
                     break;
             }
@@ -3060,6 +3051,9 @@ function Scenario_StepShots(_s) {
         case 1050: case 1051: case 1052: case 1053: case 1054: case 1055: case 1056: case 1057: case 1058: case 1059:
             Scenario_StepShotsTextFit2(_s);   // round 3 textfit2 (R-106): the Skills tab, the battle Skill list and the Controls page with the long names, three sizes; the end of the pictures
             break;
+        case 1060: case 1061: case 1062: case 1063: case 1064: case 1065: case 1066: case 1067: case 1068: case 1069:
+            Scenario_StepShotsR3Saves2(_s);   // saves2 (D175): the title with its buttons, Load Game, the overwrite picker, the profile screen, the name entry, the Codex from the title; three sizes, English and Korean; the end of the pictures
+            break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
             break;
@@ -3713,7 +3707,7 @@ function Scenario_StepShotsUi(_s) {
         case 82:   // down to Settings -> confirm (D35: no difficulty panel between the title and here)
             if (_s.t == 3) Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
             if (_s.t == 10) { RunSave_Delete(); _c.title_refresh = true; }   // C1: an earlier shot started a run; with no run save Continue is greyed and Down lands on Settings
-            if (_s.t == 20) Ui_MenuFixCursor(_c.title_stk.menus[0], 0);   // review 1: with a run saved the title started on Continue; back to New Game so Down lands on Settings
+            if (_s.t == 20) Ui_MenuFixCursor(_c.title_stk.menus[0], 1);   // D175 (New Game is row 1) review 1: with a run saved the title started on Continue; back to New Game so Down lands on Settings
             if (_s.t == 30) Scenario_Tap("menu_down");
             if (_s.t == 36) Scenario_Tap("confirm");
             if (_s.t == 60) Ui_MenuFixCursor(_sp.menu, 0);   // an earlier shot left the remembered cursor on the Window row
@@ -4947,9 +4941,9 @@ function Scenario_StepSmokeRun(_s) {
             break;
         case 107:   // relaunch: the title's Continue row
             if (_s.t > 40 && room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_sc.title_stk) && !Transition_IsActive() && _gs.ui.mode == UI_NONE) {
-                Scenario_Check("continue_row_is_on_when_a_run_save_exists", _sc.title_stk.menus[0].items[1].enabled);
+                Scenario_Check("continue_row_is_on_when_a_run_save_exists", _sc.title_stk.menus[0].items[0].id == "continue" && _sc.title_stk.menus[0].items[0].enabled);
                 Scenario_Check("continue_no_run_in_memory_before", !Run_IsActive());
-                Ui_MenuFixCursor(_sc.title_stk.menus[0], 1);   // the Continue row
+                Ui_MenuFixCursor(_sc.title_stk.menus[0], 0);   // the Continue row (D175: row 0)
                 Scenario_Tap("confirm");
                 Scenario_Next(_s, 108);
             }
@@ -8100,14 +8094,14 @@ function Scenario_StepSmokeNotice(_s) {
                 Scenario_Check("notice_confirm_dismisses_it", true);
                 Scenario_Check("notice_the_ui_mode_is_free_again", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
                 Scenario_Check("notice_the_dismissing_press_did_not_pick_new_game", room == rm_start && !is_struct(_sc.title_exit), "room=" + room_get_name(room));
-                Scenario_Check("notice_continue_is_on", _top.items[1].enabled);
+                Scenario_Check("notice_continue_is_on", _top.items[0].enabled);
                 Scenario_Next(_s, 213);
             }
             if (_s.t > 300) { Scenario_Check("notice_confirm_dismisses_it", false, "open=" + string(Notice_IsOpen()) + " pressed=" + string(variable_struct_exists(_n, "pressed"))); Scenario_NoticeEnd(); }
             break;
         case 213:   // Continue still works after the notice
             if (_s.t == 20) {
-                Ui_MenuFixCursor(_top, 1);
+                Ui_MenuFixCursor(_top, 0);   // D175: Continue is row 0
                 Scenario_Tap("confirm");
             }
             if (_s.t > 60 && Scenario_FloorReady(rm_floor1)) {
@@ -8130,8 +8124,8 @@ function Scenario_StepSmokeNotice(_s) {
             break;
         case 215:   // Continue on the damaged file: the failure text, in the same notice
             if (_s.t == 10) {
-                Scenario_Check("notice_continue_is_on_for_a_file_that_exists", _top.items[1].enabled);
-                Ui_MenuFixCursor(_top, 1);
+                Scenario_Check("notice_continue_is_on_for_a_file_that_exists", _top.items[0].enabled);
+                Ui_MenuFixCursor(_top, 0);   // D175: Continue is row 0
                 Scenario_Tap("confirm");
             }
             if (_s.t > 10 && Notice_IsOpen()) {
@@ -8158,7 +8152,7 @@ function Scenario_StepSmokeNotice(_s) {
             break;
         case 217:   // New Game after the notice
             if (_s.t == 15) {
-                Ui_MenuFixCursor(_top, 0);
+                Ui_MenuFixCursor(_top, 1);   // D175: New Game is row 1
                 Scenario_Tap("confirm");
             }
             if (_s.t == 30) Scenario_Tap("confirm");   // D152: Random seed, the first row of the pick New Game opened
@@ -8329,13 +8323,13 @@ function Scenario_StepSmokeReg(_s) {
         case 231:   // at the title: a half-left cutscene state is put in place (what an interrupted exit would leave), then Continue
             if (_s.t > 40 && room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_sc.title_stk) && !Transition_IsActive() && _gs.ui.mode == UI_NONE) {
                 var _m231 = _sc.title_stk.menus[0];
-                Scenario_Check("regr_r028_continue_is_on_at_the_title", _m231.items[1].enabled);
+                Scenario_Check("regr_r028_continue_is_on_at_the_title", _m231.items[0].id == "continue" && _m231.items[0].enabled);
                 _gs.ui.cutscene_active = true;
                 _gs.ui.cutscene_bg_sprite = mini_boss_profile;
                 _gs.ui.cutscene_text_only = true;
                 _gs.ui.dialogue_box_half = true;
                 Scenario_Check("regr_r028_the_stale_state_is_in_place_before_continue", !Scenario_CutsceneUi().ok && Scenario_CutsceneUi().drawn);
-                Ui_MenuFixCursor(_m231, 1);   // the Continue row
+                Ui_MenuFixCursor(_m231, 0);   // the Continue row (D175: row 0)
                 Scenario_Tap("confirm");
                 Scenario_Next(_s, 232);
             }
@@ -9637,7 +9631,7 @@ function Scenario_StepShotsTitle(_s) {
                     Scenario_Check("shots_title_menu_is_inside_the_gui_" + _tag, _mr.x >= 0 && _mr.y >= 0 && _mr.x + _mr.w <= _mt.gw && _mr.y + _mr.h <= _mt.gh, json_stringify(_mr));
                     var _br = Build_IdRect();   // G10 (D129): the build id stands in the lower right corner; no panel may reach it, at any size or language
                     Scenario_Check("shots_title_build_id_clear_of_the_menu_" + _tag, !Test_RectsOverlap(_br, _mr), json_stringify(_br) + " vs " + json_stringify(_mr));
-                    if (_sc == "korean") Scenario_Check("shots_title_labels_are_korean_" + _tag, Loc_GetLanguage() == "ko" && _c.title_stk.menus[0].items[0].label != "New Game" && _c.title_stk.menus[0].items[0].label != "New game", "label=" + string(_c.title_stk.menus[0].items[0].label));
+                    if (_sc == "korean") Scenario_Check("shots_title_labels_are_korean_" + _tag, Loc_GetLanguage() == "ko" && _c.title_stk.menus[0].items[1].label != "New Game" && _c.title_stk.menus[0].items[1].label != "New game", "label=" + string(_c.title_stk.menus[0].items[1].label));
                     if (_sc == "menu") {
                         Scenario_Check("shots_title_no_card_without_a_run_" + _tag, _c.title_card.kind == "none");
                     } else {
@@ -9646,7 +9640,7 @@ function Scenario_StepShotsTitle(_s) {
                         Scenario_Check("shots_title_card_is_inside_the_gui_" + _tag, _cr.x >= 0 && _cr.y >= 0 && _cr.x + _cr.w <= _mt.gw && _cr.y + _cr.h <= _mt.gh, json_stringify(_cr));
                         Scenario_Check("shots_title_card_does_not_overlap_the_menu_" + _tag, _cr.x + _cr.w <= _mr.x || _mr.x + _mr.w <= _cr.x || _cr.y + _cr.h <= _mr.y || _mr.y + _mr.h <= _cr.y, json_stringify(_cr) + " vs " + json_stringify(_mr));
                         Scenario_Check("shots_title_build_id_clear_of_the_card_" + _tag, !Test_RectsOverlap(_br, _cr), json_stringify(_br) + " vs " + json_stringify(_cr));
-                        Scenario_Check("shots_title_cursor_is_on_continue_" + _tag, _c.title_stk.menus[0].cursor == 1);
+                        Scenario_Check("shots_title_cursor_is_on_continue_" + _tag, _c.title_stk.menus[0].cursor == 0);
                     }
                 }
                 _s.shot = "shot_title_" + _sc + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
@@ -11353,7 +11347,7 @@ function Scenario_StepSmokeOneMenu(_s) {
             if (room == rm_start && _sc != noone && !Transition_IsActive() && !variable_struct_exists(_o, "cont")) {
                 if (_sc.state != "main") { _sc.state = "main"; break; }
                 if (is_struct(_sc.title_stk) && _s.t > 20) {
-                    Scenario_Check("onemenu_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 1, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
+                    Scenario_Check("onemenu_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 0, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
                     Scenario_Tap("confirm");
                     _o.cont = _s.t;
                 }
@@ -11430,7 +11424,7 @@ function Scenario_StepSmokeSeed(_s) {
             break;
         case 551:   // New Game (no run is saved: one press) opens the seed pick
             if (_s.t == 1) {
-                Scenario_Check("seed_smoke_the_cursor_starts_on_new_game", _top.cursor == 0 && _top.items[0].id == "new", "cursor=" + string(_top.cursor));
+                Scenario_Check("seed_smoke_the_cursor_starts_on_new_game", _top.cursor == 1 && _top.items[1].id == "new", "cursor=" + string(_top.cursor));   // D175: Continue is row 0 (greyed with nothing saved)
                 Scenario_Tap("confirm");
             }
             if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") {
@@ -11626,7 +11620,6 @@ function Scenario_StepSmokeConfirm(_s) {
     var _u = TabMenu_Get();
     var _qa = "Abandon this run? It counts as a death, but you keep the echo.";
     var _qq = "Quit to title? The run is saved and Continue picks it up again.";
-    var _qn = "Start a new game? The saved run will be abandoned.";
     switch (_s.step) {
         case 649:   // setup (merge order): the step before (H11, D153) ends in rm_floor3; the run goes on in rm_floor1, where the System tab asks about it
             if (_s.t == 1) {
@@ -11705,8 +11698,8 @@ function Scenario_StepSmokeConfirm(_s) {
                 if (_sc.state != "main") { _sc.state = "main"; break; }
                 if (is_struct(_sc.title_stk) && _s.t > 20) {
                     _h.tt = _s.t;
-                    Scenario_Check("confirm_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 1, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));
-                    Scenario_Tap("menu_up");
+                    Scenario_Check("confirm_the_title_cursor_is_on_continue", Ui_StackTop(_sc.title_stk).cursor == 0, "cursor=" + string(Ui_StackTop(_sc.title_stk).cursor));   // D175: Continue is row 0
+                    Scenario_Tap("menu_down");
                 }
             }
             if (!variable_struct_exists(_h, "tt")) {
@@ -11716,28 +11709,20 @@ function Scenario_StepSmokeConfirm(_s) {
             var _k = _s.t - _h.tt;
             var _tm0 = (_sc != noone && is_struct(_sc.title_stk)) ? _sc.title_stk.menus[0] : undefined;
             if (_k == 14) {
-                Scenario_Check("confirm_up_from_continue_is_new_game", is_struct(_tm0) && _tm0.cursor == 0 && _tm0.items[0].id == "new", "cursor=" + (is_struct(_tm0) ? string(_tm0.cursor) : "none"));
+                Scenario_Check("confirm_down_from_continue_is_new_game", is_struct(_tm0) && _tm0.cursor == 1 && _tm0.items[1].id == "new", "cursor=" + (is_struct(_tm0) ? string(_tm0.cursor) : "none"));
                 Scenario_Tap("confirm");
             }
-            if (_k == 28) {
-                Scenario_Check("confirm_new_game_over_a_saved_run_asks", Confirm_IsOpen() && Confirm_Question() == _qn && Confirm_Menu().cursor == 1, Confirm_IsOpen() ? Confirm_Question() : "none");
+            if (_k == 28) {   // D175 amends D156: New Game over a saved run asks nothing (the next empty save file takes the new run); only the seed pick opens
+                Scenario_Check("confirm_new_game_over_a_saved_run_asks_no_abandon_question", !Confirm_IsOpen() && is_struct(_sc.title_stk) && Ui_StackTop(_sc.title_stk).id == "seed_choice", Confirm_IsOpen() ? Confirm_Question() : "none");
                 Scenario_Check("confirm_new_game_has_not_started", room == rm_start && !is_struct(_sc.title_exit) && RunSave_HasSave());
-                Scenario_Tap("confirm");   // No
+                Scenario_Tap("cancel");   // Back from the seed pick
             }
             if (_k == 42) {
-                Scenario_Check("confirm_no_stays_on_the_title", !Confirm_IsOpen() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit) && RunSave_HasSave() && !Transition_IsActive());
-                Scenario_Tap("confirm");
+                Scenario_Check("confirm_back_stays_on_the_title", !Confirm_IsOpen() && room == rm_start && _sc.state == "main" && Ui_StackDepth(_sc.title_stk) == 1 && !is_struct(_sc.title_exit) && RunSave_HasSave() && !Transition_IsActive());
+                Scenario_Tap("menu_up");
             }
             if (_k == 56) {
-                Scenario_Check("confirm_new_game_asks_again", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
-                Scenario_Tap("cancel");   // Back is No
-            }
-            if (_k == 70) {
-                Scenario_Check("confirm_back_stays_on_the_title", !Confirm_IsOpen() && room == rm_start && _sc.state == "main" && !is_struct(_sc.title_exit) && RunSave_HasSave());
-                Scenario_Tap("menu_down");
-            }
-            if (_k == 84) {
-                Scenario_Check("confirm_down_is_continue_again", is_struct(_tm0) && _tm0.cursor == 1 && _tm0.items[1].id == "load");
+                Scenario_Check("confirm_up_is_continue_again", is_struct(_tm0) && _tm0.cursor == 0 && _tm0.items[0].id == "continue");
                 Scenario_Tap("confirm");
                 _h.cont = _s.t;
             }
@@ -12110,7 +12095,7 @@ function Scenario_StepShotsSeed(_s) {
     }
 }
 
-// ---- H2 (D156) pictures 670..673: the shared Yes / No pop-up over the System tab (Abandon run), over the title (New Game with a run saved) and in Korean
+// ---- H2 (D156) pictures 670..673: the shared Yes / No pop-up over the System tab (Abandon run), over the title (New Game with all three save files used: Overwrite Save 2?) and in Korean
 // over the System tab, at windowed scale 3 (480 x 432) and 5 (800 x 720). Each is the real draw of the real screen; the pop-up is asserted on its rectangles
 // (on screen, centred, the two rows inside it, the cursor on No). Files shot_confirm_<scene>_<w>x<h>.png. The title scene writes the real run.sav
 // (the gate's scratch folder only). The last picture of the chain goes on with H5's 770..773. ----
@@ -12141,8 +12126,8 @@ function Scenario_StepShotsConfirm(_s) {
                 Loc_SetLanguage("en");
                 Scenario_SetWindowScale(_scales[_o.si]);
                 if (_sc == "title") {
-                    RunSave_Delete();
-                    Scenario_TitleRunFile();
+                    Scenario_ProfilesWipe();   // D175: all three save files used: New Game asks which to overwrite, then Yes / No
+                    for (var _cs = 0; _cs < PROFILE_SLOTS; _cs++) Test_ProfPutRun(Slots_PathOf(Profiles_Active(), _cs), 3, 7000 + _cs, CLASS_KNIGHT, 2 + _cs, 1 + _cs, 90000, date_create_datetime(2026, 10, 16, 14, 5, 0));
                     _gs.in_main_menu = true;
                     _gs.startup_logo_seen = true;
                     room_goto(rm_start);
@@ -12159,8 +12144,8 @@ function Scenario_StepShotsConfirm(_s) {
         case 671:   // open the pop-up the way the game does
             if (_sc == "title") {
                 var _tm = _c.title_stk.menus[0];
-                Ui_MenuFixCursor(_tm, 0);
-                Title_OnConfirm(_tm, 0);
+                Title_NewPress(_c, _tm);   // D175: the overwrite picker opens, picking save 2 asks "Overwrite Save 2?"
+                Title_PickerConfirm(Ui_StackTop(_c.title_stk), 1);
             } else {
                 with (obj_enemy) instance_destroy();
                 Scenario_ClearUi();
@@ -12200,6 +12185,7 @@ function Scenario_StepShotsConfirm(_s) {
                 Confirm_Close();
                 if (is_struct(TabMenu_Get())) Menu_Close(true);
                 Scenario_ClearUi();
+                if (_sc == "title") Scenario_ProfilesWipe();   // the three save files of the title scene
                 _o.si++;
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
@@ -14595,7 +14581,473 @@ function Scenario_StepSmokeR3Stealth(_s) {
             }
             break;
         case 1059:   // the end of the chain: removes the files and the profile the steps made
-            Scenario_NoticeEnd();
+            Scenario_Next(_s, 1070);   // goes on with saves2 (1070..1089), the end of the chain
+            break;
+    }
+}
+
+// Round 3, packet saves2 (D175, R-107), smoke steps 1070..1089: the title with profiles and three save files, through the real title and real keys. They go on from r3light (1004).
+// 1070..1078 (save files): a fresh profile (nothing saved: Continue and Load Game are grey, the cursor is on New Game), New Game starts in save 1 and the intro plays; back on
+// the title Continue is on and has the cursor, New Game starts in save 2 and the intro does NOT play again; Load Game lists save 1 and 2 (3 greyed), the delete key asks, Yes
+// deletes save 2; Continue loads save 1. 1080..1086 (profiles): Q opens the profile screen, New Profile asks for a name (an empty one is refused, "ABC" is typed with the keys), the title shows
+// ABC with nothing to continue, New Game uses ABC's save 1 and the intro plays (a new profile starts fresh), the second New Game uses save 2 without the intro, Load Game lists both, the
+// delete key removes save 2; switching to Profile 1 makes Continue follow; deleting profile ABC asks and removes its files. 1087..1088 (Codex): E opens the Codex of the active profile
+// from the title (the list, Run History, Back twice), the buttons' rectangles. The last step calls Scenario_NoticeEnd.
+// ============================================================================
+function Scenario_ProfilesWipe() {
+    Save_DeleteFileSet(Profiles_IndexPath());
+    if (file_exists(Profiles_IndexPath() + ".corrupt")) file_delete(Profiles_IndexPath() + ".corrupt");
+    for (var _i = 0; _i < PROFILES_MAX; _i++) {
+        Save_DeleteFileSet(Profiles_PathOf(_i));
+        for (var _s = 0; _s < PROFILE_SLOTS; _s++) {
+            var _rp = Slots_PathOf(_i, _s);
+            Save_DeleteFileSet(_rp);
+            var _kf = RunSave_KeptFiles(_rp);
+            for (var _k = 0; _k < array_length(_kf); _k++) Save_DeleteFileSet(_kf[_k]);
+        }
+    }
+    global.profiles_index = undefined;
+    global.profile = undefined;
+    global.profile_status = "missing";
+    global.save_slot_active = 0;
+}
+
+function Scenario_StepSmokeR3Saves2(_s) {
+    var _gs = GameState_Get();
+    var _sc = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    var _top = (_sc != noone && is_struct(_sc.title_stk)) ? Ui_StackTop(_sc.title_stk) : undefined;
+    if (!variable_struct_exists(_s, "r3s2")) _s.r3s2 = { intro: false };
+    var _d = _s.r3s2;
+    if (room == rm_start && _sc != noone && _sc.state == "boot_logo") _sc.state = "main";   // the logo is not what is checked here
+    var _title_ready = (room == rm_start && _sc != noone && _sc.state == "main" && is_struct(_top) && !Transition_IsActive() && !Notice_IsOpen() && !Confirm_IsOpen());
+    if (room == rm_cutscene) _d.intro = true;   // set whenever the intro cutscene room was seen since the flag was last cleared
+    switch (_s.step) {
+        case 1070:   // a fresh profile, then the title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP saves2 smoke (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();   // not NoticeEnd / a wipe: outside the gate those would touch the real profile files
+                    break;
+                }
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Confirm_Close();
+                Scenario_ProfilesWipe();
+                Scenario_NoticeToTitle();
+            }
+            if (_s.t > 20 && _title_ready) Scenario_Next(_s, 1071);
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_reaches_the_title", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1071:   // nothing saved: Continue and Load Game are grey, the cursor is on New Game
+            if (_s.t == 1) {
+                var _ids = "";
+                for (var _i = 0; _i < array_length(_top.items); _i++) _ids += ((_i > 0) ? "," : "") + _top.items[_i].id;
+                Scenario_Check("saves2_smoke_the_title_rows", _ids == "continue,new,load,settings,exit", _ids);
+                Scenario_Check("saves2_smoke_continue_is_grey_with_nothing_saved", !_top.items[0].enabled);
+                Scenario_Check("saves2_smoke_load_game_is_grey_with_nothing_saved", !_top.items[2].enabled);
+                Scenario_Check("saves2_smoke_the_cursor_starts_on_new_game", _top.cursor == 1, "cursor=" + string(_top.cursor));
+                Scenario_Check("saves2_smoke_a_fresh_profile_has_not_seen_the_intro", !Story_Seen(Story_CutsceneKey("intro")));
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 8 && is_struct(_top) && _top.id == "seed_choice") Scenario_Next(_s, 1072);
+            if (_s.t > 300) { Scenario_Check("saves2_smoke_new_game_opens_the_seed_pick", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1072:   // Random seed: the intro plays, in save 1
+            Scenario_SeedPickRandom(_s);
+            if (room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                Scenario_Check("saves2_smoke_a_fresh_profile_plays_the_intro", _d.intro);
+                Scenario_Check("saves2_smoke_new_game_uses_save_1", Slot_Active() == 0, "slot=" + string(Slot_Active()));
+                Scenario_Hold("confirm", 150);   // D48: hold to skip the intro
+                Scenario_Next(_s, 1073);
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_the_intro_starts", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1073:   // the run is up in save 1; its file is written; back to the title
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Release();
+                _d.seed0 = Run_Get().seed;
+                Scenario_Check("saves2_smoke_the_run_is_in_save_1", Slot_Active() == 0);
+                Scenario_Check("saves2_smoke_the_intro_is_marked_seen", Story_Seen(Story_CutsceneKey("intro")));
+                Run_AutoSave();
+                Scenario_Check("saves2_smoke_save_1_is_written", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                _d.intro = false;
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1074);
+            }
+            if (_s.t > 1500) { Scenario_Check("saves2_smoke_the_first_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1074:   // Continue is on and has the cursor; Down to New Game; the second New Game uses save 2 and no intro
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t74")) {
+                    _d.t74 = _s.t;
+                    Scenario_Check("saves2_smoke_continue_is_on_with_a_save", _top.items[0].enabled);
+                    Scenario_Check("saves2_smoke_the_cursor_starts_on_continue", _top.cursor == 0, "cursor=" + string(_top.cursor));
+                    Scenario_Check("saves2_smoke_load_game_is_on_with_a_save", _top.items[2].enabled);
+                    Scenario_Check("saves2_smoke_the_continue_card_is_shown", _sc.title_card.kind == "run", string(_sc.title_card.kind));
+                    Scenario_Tap("menu_down");
+                }
+                if (_s.t == _d.t74 + 8) {
+                    Scenario_Check("saves2_smoke_down_reaches_new_game", _top.cursor == 1 && _top.items[1].id == "new", "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+                if (_s.t > _d.t74 + 14 && _top.id == "seed_choice") {
+                    Scenario_Check("saves2_smoke_a_used_save_1_asks_no_question", !Confirm_IsOpen());
+                    Scenario_Next(_s, 1075);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_the_second_new_game_opens_the_seed_pick", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1075:   // Random seed: straight to the floor, no intro, in save 2
+            Scenario_SeedPickRandom(_s);
+            if (_s.t > 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("saves2_smoke_the_intro_does_not_play_again", !_d.intro);
+                Scenario_Check("saves2_smoke_new_game_uses_save_2", Slot_Active() == 1, "slot=" + string(Slot_Active()));
+                Scenario_Check("saves2_smoke_save_1_is_untouched", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                Run_AutoSave();
+                Scenario_Check("saves2_smoke_save_2_is_written", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1076);
+            }
+            if (_s.t > 1500) { Scenario_Check("saves2_smoke_the_second_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1076:   // Load Game: save 1 and 2 are listed, 3 is greyed
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t76")) {
+                    _d.t76 = _s.t;
+                    Ui_MenuFixCursor(_top, 2);
+                    Scenario_Check("saves2_smoke_the_cursor_is_on_load_game", _top.items[_top.cursor].id == "load", "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                }
+                if (_s.t > _d.t76 + 8 && _top.id == "slots_load") {
+                    Scenario_Check("saves2_smoke_load_game_lists_three_files", array_length(_top.items) == 3);
+                    Scenario_Check("saves2_smoke_saves_1_and_2_are_listed_save_3_is_greyed", _top.items[0].enabled && _top.items[1].enabled && !_top.items[2].enabled && _top.items[2].value == Loc_T("save.slot.empty", "Empty"));
+                    Scenario_Check("saves2_smoke_the_title_menu_is_below_the_picker", Ui_StackDepth(_sc.title_stk) == 2);
+                    Scenario_Tap("menu_down");
+                    Scenario_Next(_s, 1077);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_load_game_opens_the_picker", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1077:   // the cursor on save 2, the delete key (Q) asks, No keeps it, then Yes deletes it
+            switch (_s.t) {
+                case 10:
+                    Scenario_Check("saves2_smoke_down_moves_to_save_2", _top.id == "slots_load" && _top.cursor == 1, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 20:
+                    Scenario_Check("saves2_smoke_the_delete_key_asks", Confirm_IsOpen() && Confirm_Question() == "Delete Save 2? The run in it will be lost.", Confirm_IsOpen() ? Confirm_Question() : "none");
+                    Scenario_Check("saves2_smoke_the_question_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                    Scenario_Tap("confirm");   // No
+                    break;
+                case 30:
+                    Scenario_Check("saves2_smoke_no_keeps_save_2", !Confirm_IsOpen() && RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 40:
+                    Scenario_Check("saves2_smoke_it_asks_again", Confirm_IsOpen());
+                    Scenario_Tap("menu_up");   // Yes
+                    break;
+                case 46:
+                    Scenario_Tap("confirm");
+                    break;
+                case 56:
+                    Scenario_Check("saves2_smoke_yes_deletes_save_2", !RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 1)));
+                    Scenario_Check("saves2_smoke_the_picker_shows_save_2_empty", _top.id == "slots_load" && _top.items[1].value == Loc_T("save.slot.empty", "Empty") && !_top.items[1].enabled);
+                    Scenario_Check("saves2_smoke_save_1_is_still_there", RunSave_ExistsAt(Slots_PathOf(Profiles_Active(), 0)));
+                    Scenario_Check("saves2_smoke_continue_targets_save_1_now", Slots_ContinueTarget() == 0, "target=" + string(Slots_ContinueTarget()));
+                    Scenario_Tap("cancel");
+                    Scenario_Next(_s, 1078);
+                    break;
+            }
+            break;
+        case 1078:   // back on the title (Continue on), Continue loads save 1
+            if (_s.t == 12) {
+                Scenario_Check("saves2_smoke_back_leaves_the_picker", _top.id == "title" && Ui_StackDepth(_sc.title_stk) == 1, "top=" + string(_top.id));
+                Ui_MenuFixCursor(_top, 0);
+                Scenario_Check("saves2_smoke_continue_is_still_on", _top.items[0].enabled && _top.cursor == 0);
+                Scenario_Tap("confirm");
+            }
+            if (_s.t > 20 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                Scenario_Check("saves2_smoke_continue_loads_save_1", Run_Get().seed == _d.seed0, "seed=" + string(Run_Get().seed) + " want " + string(_d.seed0));
+                Scenario_Check("saves2_smoke_continue_makes_save_1_the_active_file", Slot_Active() == 0);
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Scenario_NoticeToTitle();
+                Scenario_Next(_s, 1080);   // the profile steps (1080..1086) go on from here
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_continue_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_NoticeEnd(); }
+            break;
+        case 1080:   // the profile button's key (Q) opens the profile screen: one profile (Profile 1, Active) and New Profile
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t80")) {
+                    _d.t80 = _s.t;
+                    Scenario_Check("saves2_smoke_the_title_shows_the_active_profile_button", _sc.title_btn.profile.w > 0 && Profiles_ActiveName() == "Profile 1", json_stringify(_sc.title_btn.profile));
+                    Scenario_Tap("tab_prev");
+                }
+                if (_s.t > _d.t80 + 8 && _top.id == "profiles") {
+                    var _ids80 = "";
+                    for (var _i = 0; _i < array_length(_top.items); _i++) _ids80 += ((_i > 0) ? "," : "") + _top.items[_i].id;
+                    Scenario_Check("saves2_smoke_the_profile_key_opens_the_profile_screen", Ui_StackDepth(_sc.title_stk) == 2);
+                    Scenario_Check("saves2_smoke_one_profile_and_new_profile", _ids80 == "prof_0,prof_new", _ids80);
+                    Scenario_Check("saves2_smoke_the_active_profile_is_marked", _top.items[0].value == Loc_T("profile.val.active", "Active") && _top.cursor == 0);
+                    Scenario_Next(_s, 1081);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_the_profile_screen_opens", false, "room=" + room_get_name(room)); Scenario_S2End(); }
+            break;
+        case 1081:   // New Profile: the name entry; an empty name is refused; "ABC" is typed with the keys; Enter makes it and switches to it
+            var _nm = (_sc != noone) ? Title_NameOf(_sc) : undefined;
+            switch (_s.t) {
+                case 2: Scenario_Tap("menu_down"); break;
+                case 10:
+                    Scenario_Check("saves2_smoke_down_reaches_new_profile", _top.id == "profiles" && _top.items[_top.cursor].id == "prof_new", "cursor=" + string(_top.cursor));
+                    Scenario_Tap("confirm");
+                    break;
+                case 24:
+                    Scenario_Check("saves2_smoke_new_profile_opens_the_name_entry", is_struct(_nm));
+                    Scenario_Check("saves2_smoke_the_entry_suggests_profile_2", is_struct(_nm) && _nm.e.text == "Profile 2", is_struct(_nm) ? _nm.e.text : "none");
+                    Scenario_Tap("name_a");
+                    break;
+                case 30: Scenario_Tap("name_b"); break;
+                case 36: Scenario_Tap("name_c"); break;
+                case 42:
+                    Scenario_Check("saves2_smoke_the_letter_keys_type_abc", is_struct(_nm) && _nm.e.text == "ABC", is_struct(_nm) ? _nm.e.text : "none");
+                    Scenario_Tap("seed_back");
+                    break;
+                case 48: Scenario_Tap("seed_back"); break;
+                case 54: Scenario_Tap("seed_back"); break;
+                case 60:
+                    Scenario_Check("saves2_smoke_backspace_clears_the_name", is_struct(_nm) && _nm.e.text == "", is_struct(_nm) ? _nm.e.text : "none");
+                    Scenario_Tap("name_ok");
+                    break;
+                case 70:
+                    Scenario_Check("saves2_smoke_an_empty_name_is_refused", is_struct(_nm) && _nm.msg && array_length(Profiles_List()) == 1);
+                    Scenario_Tap("name_a");
+                    break;
+                case 76: Scenario_Tap("name_b"); break;
+                case 82: Scenario_Tap("name_c"); break;
+                case 88:
+                    Scenario_Check("saves2_smoke_typing_clears_the_refusal_line", is_struct(_nm) && !_nm.msg && _nm.e.text == "ABC");
+                    Scenario_Tap("name_ok");
+                    break;
+                case 100:
+                    Scenario_Check("saves2_smoke_enter_makes_the_profile_and_closes_the_entry", !is_struct(_nm) && array_length(Profiles_List()) == 2);
+                    Scenario_Check("saves2_smoke_the_new_profile_is_active_and_named_abc", Profiles_ActiveName() == "ABC", Profiles_ActiveName());
+                    Scenario_Check("saves2_smoke_back_on_the_title", Ui_StackDepth(_sc.title_stk) == 1 && _sc.state == "main", "depth=" + string(Ui_StackDepth(_sc.title_stk)));
+                    Scenario_Next(_s, 1082);
+                    break;
+            }
+            break;
+        case 1082:   // the title shows ABC with nothing to continue; New Game uses save 1 and the intro plays (a new profile starts fresh)
+            if (!variable_struct_exists(_d, "p82")) {
+                if (_s.t > 20 && _title_ready) {
+                    _d.p82 = 1;
+                    _d.t82 = _s.t;
+                    Scenario_Check("saves2_smoke_the_title_shows_abc", Profiles_ActiveName() == "ABC" && _sc.title_btn.profile.w > 0);
+                    Scenario_Check("saves2_smoke_abc_has_nothing_to_continue", !_top.items[0].enabled && !_top.items[2].enabled && _top.cursor == 1, "cursor=" + string(_top.cursor));
+                    Scenario_Check("saves2_smoke_abc_has_not_seen_the_intro", !Story_Seen(Story_CutsceneKey("intro")));
+                    _d.intro = false;
+                    Scenario_Tap("confirm");
+                }
+            } else if (_d.p82 == 1) {
+                Scenario_SeedPickRandom(_s);
+                if (room == rm_cutscene && _sc != noone && _sc.cutscene_started && !Transition_IsActive() && _gs.ui.mode == UI_DIALOGUE) {
+                    Scenario_Check("saves2_smoke_a_new_profile_plays_the_intro", _d.intro);
+                    Scenario_Check("saves2_smoke_new_game_uses_save_1_of_abc", Slot_Active() == 0 && Profiles_Active() == 1, "slot=" + string(Slot_Active()) + " profile=" + string(Profiles_Active()));
+                    Scenario_Hold("confirm", 150);
+                    _d.p82 = 2;
+                }
+            } else if (_d.p82 == 2) {
+                if (_s.t > _d.t82 + 5 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                    Scenario_Release();
+                    Scenario_Check("saves2_smoke_abc_has_now_seen_the_intro", Story_Seen(Story_CutsceneKey("intro")));
+                    Run_AutoSave();
+                    Scenario_Check("saves2_smoke_abc_save_1_is_written", RunSave_ExistsAt(Slots_PathOf(1, 0)));
+                    Scenario_Check("saves2_smoke_profile_1_is_untouched", RunSave_ExistsAt(Slots_PathOf(0, 0)) && !RunSave_ExistsAt(Slots_PathOf(1, 1)));
+                    Dialogue_CloseNow();
+                    Scenario_ClearUi();
+                    _d.intro = false;
+                    Scenario_NoticeToTitle();
+                    Scenario_Next(_s, 1083);
+                }
+            }
+            if (_s.t > 2500) { Scenario_Check("saves2_smoke_abc_first_run_reaches_rm_floor1", false, "room=" + room_get_name(room) + " p=" + string(variable_struct_exists(_d, "p82") ? _d.p82 : 0)); Scenario_S2End(); }
+            break;
+        case 1083:   // back on the title (ABC): Continue is on; New Game uses save 2 and no intro
+            if (!variable_struct_exists(_d, "p83")) {
+                if (_s.t > 20 && _title_ready) {
+                    _d.p83 = 1;
+                    _d.t83 = _s.t;
+                    Scenario_Check("saves2_smoke_abc_continue_is_on_and_has_the_cursor", Profiles_ActiveName() == "ABC" && _top.items[0].enabled && _top.cursor == 0, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("menu_down");
+                }
+            } else if (_d.p83 == 1) {
+                if (_s.t == _d.t83 + 8) {
+                    Scenario_Check("saves2_smoke_down_reaches_new_game_in_abc", _top.cursor == 1 && _top.items[1].id == "new");
+                    Scenario_Tap("confirm");
+                    _d.p83 = 2;
+                }
+            } else if (_d.p83 == 2) {
+                Scenario_SeedPickRandom(_s);
+                if (_s.t > _d.t83 + 14 && Scenario_FloorReady(rm_floor1) && Run_IsActive()) {
+                    Scenario_Check("saves2_smoke_abc_second_run_plays_no_intro", !_d.intro);
+                    Scenario_Check("saves2_smoke_abc_new_game_uses_save_2", Slot_Active() == 1 && Profiles_Active() == 1, "slot=" + string(Slot_Active()));
+                    Run_AutoSave();
+                    Scenario_Check("saves2_smoke_abc_has_both_files", RunSave_ExistsAt(Slots_PathOf(1, 0)) && RunSave_ExistsAt(Slots_PathOf(1, 1)));
+                    Dialogue_CloseNow();
+                    Scenario_ClearUi();
+                    Scenario_NoticeToTitle();
+                    Scenario_Next(_s, 1084);
+                }
+            }
+            if (_s.t > 1500) { Scenario_Check("saves2_smoke_abc_second_run_reaches_rm_floor1", false, "room=" + room_get_name(room)); Scenario_S2End(); }
+            break;
+        case 1084:   // Load Game lists ABC's save 1 and 2; the delete key and Yes remove save 2
+            if (_s.t > 20 && _title_ready) {
+                if (!variable_struct_exists(_d, "t84")) {
+                    _d.t84 = _s.t;
+                    Ui_MenuFixCursor(_top, 2);
+                    Scenario_Tap("confirm");
+                }
+                if (_s.t > _d.t84 + 8 && _top.id == "slots_load") {
+                    Scenario_Check("saves2_smoke_abc_load_game_lists_save_1_and_2", _top.items[0].enabled && _top.items[1].enabled && !_top.items[2].enabled);
+                    Scenario_Next(_s, 1085);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("saves2_smoke_abc_load_game_opens", false, "room=" + room_get_name(room)); Scenario_S2End(); }
+            break;
+        case 1085:   // delete save 2 of ABC with the confirm, back to the title; then switch to Profile 1: Continue follows
+            switch (_s.t) {
+                case 2: Scenario_Tap("menu_down"); break;
+                case 10:
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 20:
+                    Scenario_Check("saves2_smoke_abc_the_delete_key_asks", Confirm_IsOpen() && Confirm_Question() == "Delete Save 2? The run in it will be lost.", Confirm_IsOpen() ? Confirm_Question() : "none");
+                    Scenario_Tap("menu_up");
+                    break;
+                case 26: Scenario_Tap("confirm"); break;
+                case 36:
+                    Scenario_Check("saves2_smoke_abc_yes_deletes_save_2", !RunSave_ExistsAt(Slots_PathOf(1, 1)) && RunSave_ExistsAt(Slots_PathOf(1, 0)));
+                    Scenario_Tap("cancel");
+                    break;
+                case 50:
+                    Scenario_Check("saves2_smoke_abc_back_on_the_title_with_continue", Ui_StackDepth(_sc.title_stk) == 1 && _top.items[0].enabled);
+                    Scenario_Tap("tab_prev");   // the profile screen again
+                    break;
+                case 62:
+                    Scenario_Check("saves2_smoke_two_profiles_and_new_profile", _top.id == "profiles" && array_length(_top.items) == 3 && _top.items[1].value == Loc_T("profile.val.active", "Active") && _top.cursor == 1, "cursor=" + string(_top.cursor));
+                    Scenario_Tap("menu_up");
+                    break;
+                case 70:
+                    Scenario_Check("saves2_smoke_up_reaches_profile_1", _top.cursor == 0 && _top.items[0].label == "Profile 1");
+                    Scenario_Tap("confirm");   // switch to it
+                    break;
+                case 84:
+                    Scenario_Check("saves2_smoke_confirm_switches_to_profile_1", Profiles_Active() == 0 && Profiles_ActiveName() == "Profile 1");
+                    Scenario_Check("saves2_smoke_the_screen_closes_after_a_switch", Ui_StackDepth(_sc.title_stk) == 1);
+                    Scenario_Check("saves2_smoke_continue_follows_the_profile", _top.items[0].enabled && _top.items[2].enabled && Slots_ContinueTarget() == 0 && _sc.title_card.kind == "run", "kind=" + string(_sc.title_card.kind));
+                    Scenario_Check("saves2_smoke_profile_1_card_shows_its_own_run", Title_CardOf(Title_State()).kind == "run");
+                    Scenario_Next(_s, 1086);
+                    break;
+            }
+            break;
+        case 1086:   // delete profile ABC with the confirm: its files go, Profile 1 stays active
+            switch (_s.t) {
+                case 2: Scenario_Tap("tab_prev"); break;
+                case 14:
+                    Scenario_Check("saves2_smoke_the_profile_screen_opens_again", _top.id == "profiles" && array_length(_top.items) == 3 && _top.cursor == 0);
+                    Scenario_Tap("menu_down");
+                    break;
+                case 22:
+                    Scenario_Check("saves2_smoke_the_cursor_is_on_abc", _top.items[_top.cursor].label == "ABC");
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 32:
+                    Scenario_Check("saves2_smoke_the_profile_delete_asks", Confirm_IsOpen() && Confirm_Question() == "Delete profile ABC? Its Codex, history and save files are lost.", Confirm_IsOpen() ? Confirm_Question() : "none");
+                    Scenario_Check("saves2_smoke_the_profile_delete_starts_on_no", Confirm_IsOpen() && Confirm_Menu().cursor == 1);
+                    Scenario_Tap("confirm");   // No
+                    break;
+                case 44:
+                    Scenario_Check("saves2_smoke_no_keeps_abc", !Confirm_IsOpen() && array_length(Profiles_List()) == 2);
+                    Scenario_Tap("tab_prev");
+                    break;
+                case 54:
+                    Scenario_Tap("menu_up");
+                    break;
+                case 60: Scenario_Tap("confirm"); break;   // Yes
+                case 72:
+                    Scenario_Check("saves2_smoke_yes_deletes_abc", array_length(Profiles_List()) == 1 && !RunSave_ExistsAt(Slots_PathOf(1, 0)), "profiles=" + string(array_length(Profiles_List())));
+                    Scenario_Check("saves2_smoke_profile_1_stays_active", Profiles_Active() == 0 && RunSave_ExistsAt(Slots_PathOf(0, 0)));
+                    Scenario_Check("saves2_smoke_the_screen_shows_profile_1_and_new_profile", _top.id == "profiles" && array_length(_top.items) == 2);
+                    Scenario_Tap("cancel");
+                    break;
+                case 84:
+                    Scenario_Check("saves2_smoke_back_to_the_title", Ui_StackDepth(_sc.title_stk) == 1 && _sc.state == "main");
+                    Scenario_Next(_s, 1087);
+                    break;
+            }
+            break;
+        case 1087:   // the Codex button's key (E) opens the Codex of the active profile: the list as the Tab menu has it, Run History counts the abandoned run
+            switch (_s.t) {
+                case 2:
+                    _d.hist0 = array_length(Profile_Get().history);
+                    Scenario_Check("saves2_smoke_the_title_shows_the_codex_button", _sc.title_btn.codex.w > 0, json_stringify(_sc.title_btn));
+                    Scenario_Tap("tab_next");
+                    break;
+                case 14:
+                    var _cx = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_the_codex_key_opens_the_codex", is_struct(_cx));
+                    if (is_struct(_cx)) {
+                        var _cr = Ui_StackTop(_cx.stk);
+                        var _ids87 = "";
+                        for (var _i = 0; _i < array_length(_cr.items); _i++) _ids87 += ((_i > 0) ? "," : "") + _cr.items[_i].id;
+                        Scenario_Check("saves2_smoke_the_codex_list_is_the_tab_menus", _cr.id == "title_codex" && _ids87 == "bestiary,notes,history,unlocks", _ids87);
+                        Scenario_Check("saves2_smoke_run_history_counts_the_runs_of_profile_1", _cr.items[2].enabled && _cr.items[2].value == string(_d.hist0) && _d.hist0 >= 1, _cr.items[2].value);
+                    }
+                    Scenario_Tap("menu_down");
+                    break;
+                case 22: Scenario_Tap("menu_down"); break;
+                case 30:
+                    var _cx2 = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_down_reaches_run_history", is_struct(_cx2) && Ui_StackTop(_cx2.stk).items[Ui_StackTop(_cx2.stk).cursor].id == "history");
+                    Scenario_Tap("confirm");
+                    break;
+                case 44:
+                    var _cx3 = Title_CodexOf(_sc);
+                    var _hp = is_struct(_cx3) ? Ui_StackTop(_cx3.stk) : undefined;
+                    Scenario_Check("saves2_smoke_run_history_opens", is_struct(_hp) && _hp.id == "codex_history" && array_length(_hp.items) == _d.hist0, is_struct(_hp) ? _hp.id : "none");
+                    Scenario_Check("saves2_smoke_the_history_row_says_it_was_abandoned", is_struct(_hp) && _hp.items[0].help == Loc_T("tab.hist.abandoned", "You abandoned this run on floor {n}.", { n: string(_hp.items[0].lines[0].value) }), is_struct(_hp) ? _hp.items[0].help : "none");
+                    Scenario_Tap("cancel");
+                    break;
+                case 58:
+                    var _cx4 = Title_CodexOf(_sc);
+                    Scenario_Check("saves2_smoke_back_goes_up_to_the_codex_list", is_struct(_cx4) && Ui_StackTop(_cx4.stk).id == "title_codex");
+                    Scenario_Tap("cancel");
+                    break;
+                case 72:
+                    Scenario_Check("saves2_smoke_back_at_the_list_closes_the_codex", !is_struct(Title_CodexOf(_sc)) && Ui_StackDepth(_sc.title_stk) == 1 && _sc.state == "main");
+                    Scenario_Check("saves2_smoke_looking_at_the_codex_changes_no_history", array_length(Profile_Get().history) == _d.hist0);
+                    Scenario_Next(_s, 1088);
+                    break;
+            }
+            break;
+        case 1088:   // a click on the Codex button opens it too (the mouse path: the same rectangle the draw keeps)
+            if (_s.t == 2) {
+                var _cb = _sc.title_btn.codex;
+                _d.pre = Title_ButtonHit(_sc, _cb.x + _cb.w / 2, _cb.y + _cb.h / 2);
+                Scenario_Check("saves2_smoke_the_codex_button_rectangle_is_hit_at_its_middle", _d.pre == "codex", string(_d.pre));
+                Scenario_Check("saves2_smoke_the_profile_button_rectangle_is_hit_at_its_middle", Title_ButtonHit(_sc, _sc.title_btn.profile.x + _sc.title_btn.profile.w / 2, _sc.title_btn.profile.y + _sc.title_btn.profile.h / 2) == "profile");
+                Scenario_Check("saves2_smoke_a_point_in_the_menu_hits_no_button", Title_ButtonHit(_sc, _top.rect.x + _top.rect.w / 2, _top.rect.y + _top.rect.h / 2) == "");
+                Scenario_Next(_s, 1089);
+            }
+            break;
+        case 1089:   // the end of the chain: removes the profiles and files the steps made
+            Scenario_S2End();
             break;
     }
 }
@@ -14975,7 +15427,7 @@ function Scenario_StepShotsR3Stealth(_s) {
     var _sc = Scenario_R3StealthScene(_h.i);
     switch (_s.step) {
         case 1040:   // build the scene _h.i
-            if (_sc == undefined) { Scenario_SetWindowScale(3); Scenario_NoticeEnd(); break; }   // the end of the pictures: removes the files and the profile the steps made
+            if (_sc == undefined) { Scenario_SetWindowScale(3); with (obj_enemy) instance_destroy(); Scenario_Next(_s, 1060); break; }   // goes on with saves2 pictures (1060..1069), the end of the pictures
             if (_s.t == 1) {
                 Scenario_Release();
                 Scenario_ClearUi();
@@ -15028,6 +15480,242 @@ function Scenario_StepShotsR3Stealth(_s) {
                 with (obj_enemy) instance_destroy();
                 _h.i++;
                 Scenario_Next(_s, 1040);
+            }
+            break;
+    }
+}
+
+// ---- Round 3, packet saves2 (D175) pictures 1060..1069: the title with its corner buttons, Load Game, the overwrite picker, the profile screen, the name entry and the Codex
+// from the title; each in English at windowed scale 3 (480 x 432), 4 (640 x 576) and 5 (800 x 720), and in Korean at the same three. Each is the real draw of the real title
+// screen reached through the real functions; the layout is asserted on the rectangles (inside the GUI, clear of the build id and of each other). Files shot_s2_<scene>_<lang>_<w>x<h>.png.
+// The scenes write the profile and save files of the gate's scratch folder (and remove them at the end). The last pictures of the run: they end it. ----
+// The end of the pictures (or a failure): the profiles and save files the scenes made go, then the run ends.
+function Scenario_S2End() {
+    Scenario_ProfilesWipe();
+    Scenario_NoticeEnd();
+}
+
+function Scenario_S2Scenes() {
+    return ["title", "load", "overwrite", "profiles", "name", "codex", "codex_history"];
+}
+
+function Scenario_S2Langs() {
+    return ["en", "ko"];
+}
+
+function Scenario_S2Scales() {
+    return [3, 4, 5];
+}
+
+// The files a scene's title shows (a clean index: Profile 1 with its three save files as the scene needs).
+function Scenario_S2Setup(_scene) {
+    Scenario_ProfilesWipe();
+    var _pid = Profiles_Active();
+    var _t = date_create_datetime(2026, 10, 16, 14, 5, 0);
+    switch (_scene) {
+        case "title":
+            Test_ProfPutRun(Slots_PathOf(_pid, 0), 3, 4242, CLASS_ARCHER, 4, 4, 754000, _t);
+            break;
+        case "load":
+            Test_ProfPutRun(Slots_PathOf(_pid, 0), 3, 4243, CLASS_KNIGHT, 3, 2, 9000, _t);
+            Test_ProfPutRun(Slots_PathOf(_pid, 1), 3, 4244, CLASS_MAGE, 12, 7, 5025000, _t);
+            Test_RawWrite(Slots_PathOf(_pid, 2), Test_ProfRunText(4, 4245, CLASS_ARCHER, 2, 1, 1000, _t));   // a newer version: "Cannot load"
+            break;
+        case "overwrite":
+            Test_ProfPutRun(Slots_PathOf(_pid, 0), 3, 4246, CLASS_KNIGHT, 3, 2, 9000, _t);
+            Test_ProfPutRun(Slots_PathOf(_pid, 1), 3, 4247, CLASS_MAGE, 12, 7, 5025000, _t);
+            Test_ProfPutRun(Slots_PathOf(_pid, 2), 3, 4248, CLASS_ARCHER, 5, 3, 600000, _t);
+            break;
+        case "profiles":   // three profiles with different numbers (the first is the active one), so New Profile is still a row
+            Profile_Get().runs_started = 14;
+            Profile_Get().wins = 2;
+            Profile_Get().best_floor = 6;
+            Profile_Flush();
+            var _pb = Profiles_Create("Bea");
+            var _pc = Profiles_Create("Alexander II");
+            Test_R3s2WriteStats(_pb, 3, 0, 2);
+            Test_R3s2WriteStats(_pc, 120, 11, 10);
+            Test_ProfPutRun(Slots_PathOf(_pid, 0), 3, 4249, CLASS_KNIGHT, 3, 2, 9000, _t);
+            break;
+        case "name":
+            break;
+        case "codex":   // a profile with three finished runs and two enemies met: the list has numbers, the history page has rows
+        case "codex_history":
+            Profile_RecordRun(Profile_Get(), { seed: 4301, class_id: CLASS_KNIGHT, level: 5, floor: 4, room: "rm_floor4", result: "died", cause: "Direwolf", kills: 12, gold: 40, at: 1 });
+            Profile_RecordRun(Profile_Get(), { seed: 4302, class_id: CLASS_MAGE, level: 3, floor: 2, room: "rm_floor2", result: "abandoned", cause: "abandoned", kills: 5, gold: 12, at: 2 });
+            Profile_RecordRun(Profile_Get(), { seed: 4303, class_id: CLASS_ARCHER, level: 9, floor: 7, room: "rm_floor7", result: "died", cause: "Ghost Sword", kills: 31, gold: 88, at: 3 });
+            Codex_RecordMeeting(ENEMY_SLIME, false);
+            Codex_RecordMeeting(ENEMY_DIREWOLF, true);
+            Profile_Flush();
+            break;
+    }
+}
+
+function Scenario_S2Inside(_r, _mt) {
+    return _r.w > 0 && _r.x >= 0 && _r.y >= 0 && _r.x + _r.w <= _mt.gw && _r.y + _r.h <= _mt.gh;
+}
+
+function Scenario_StepShotsR3Saves2(_s) {
+    var _scenes = Scenario_S2Scenes();
+    var _langs = Scenario_S2Langs();
+    var _scales = Scenario_S2Scales();
+    var _gs = GameState_Get();
+    if (!variable_struct_exists(_s, "s2")) _s.s2 = { di: 0, li: 0, si: 0 };
+    var _o = _s.s2;
+    var _scene = _scenes[_o.di];
+    var _lang = _langs[_o.li];
+    var _tag = _scene + "_" + _lang + "_" + string(_scales[_o.si]);
+    var _c = instance_exists(obj_start_controller) ? instance_find(obj_start_controller, 0) : noone;
+    switch (_s.step) {
+        case 1060:   // the files, the language and the window scale of this picture, then a fresh title
+            if (_s.t == 1) {
+                if (!Scenario_CanSaveSlot()) {
+                    show_debug_message("[TEST] SKIP saves2 shots (LOCALAPPDATA is not the gate scratch folder)");
+                    Scenario_Finish();   // not NoticeEnd / a wipe: outside the gate those would touch the real profile files
+                    break;
+                }
+                Scenario_ClearUi();
+                Confirm_Close();
+                Notice_Interrupt();
+                Loc_SetLanguage("en");   // the room restart below reads the saved language again: Korean is set once the title is up
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Scenario_S2Setup(_scene);
+                Scenario_NewKnight(CLASS_KNIGHT);
+                _gs.in_main_menu = true;
+                _gs.startup_logo_seen = true;
+                room_goto(rm_start);
+            }
+            if (_s.t >= 40 && room == rm_start && _c != noone && _c.state == "main" && is_struct(_c.title_stk) && !Transition_IsActive() && !Notice_IsOpen() && Ui_MenuAlpha(_c.title_stk.menus[0], current_time) >= 1) {
+                if (_lang == "ko") {
+                    Loc_SetLanguage("ko");
+                    _c.title_refresh = true;
+                }
+                Scenario_Next(_s, 1061);
+            }
+            if (_s.t > 900) { Scenario_Check("shots_s2_reaches_the_title_" + _tag, false, "room=" + room_get_name(room)); Scenario_S2End(); }
+            break;
+        case 1061:   // open the screen of the scene
+            if (_s.t == 1) {
+                var _m0 = _c.title_stk.menus[0];
+                switch (_scene) {
+                    case "load": Title_OnConfirm(_m0, 2); break;
+                    case "overwrite": Title_NewPress(_c, _m0); break;
+                    case "profiles": Title_ProfileOpen(_c); break;
+                    case "codex": Title_CodexOpen(_c); break;
+                    case "codex_history":
+                        Title_CodexOpen(_c);
+                        Title_CodexPage(_c, "history");
+                        break;
+                    case "name":
+                        var _pm = Title_ProfileOpen(_c);
+                        Title_ProfileConfirm(_pm, array_length(_pm.items) - 1);   // the New Profile row
+                        var _nn = Title_NameOf(_c);
+                        if (is_struct(_nn)) {   // a few typed letters, the cursor on a cell of the grid, so the picture shows both
+                            NameEntry_Type(_nn.e, "A");
+                            NameEntry_Type(_nn.e, "L");
+                            NameEntry_Type(_nn.e, "E");
+                            NameEntry_Type(_nn.e, "X");
+                            _nn.e.cx = 4;
+                            _nn.e.cy = 1;
+                        }
+                        break;
+                }
+            }
+            if (_s.t >= 30) Scenario_Next(_s, 1062);
+            break;
+        case 1062:   // let it slide in, assert the layout, take the picture
+            var _top = Ui_StackTop(_c.title_stk);
+            var _nent = (_c != noone) ? Title_NameOf(_c) : undefined;
+            var _is_name = (_scene == "name");
+            var _cdx = (_c != noone) ? Title_CodexOf(_c) : undefined;
+            var _is_codex = (string_pos("codex", _scene) == 1);
+            var _ready2 = _is_name ? (is_struct(_nent) && Ui_AnimT(_nent.t, current_time) >= 1 && variable_instance_exists(_c, "title_name_rects"))
+                                   : (_is_codex ? (is_struct(_cdx) && Ui_AnimT(_cdx.t, current_time) >= 1 && Ui_MenuAlpha(Ui_StackTop(_cdx.stk), current_time) >= 1 && Ui_StackTop(_cdx.stk).rect.w > 0)
+                                                : (Ui_MenuAlpha(_top, current_time) >= 1));
+            if (_s.t >= 4 && _ready2) {
+                var _mt = Ui_Metrics();
+                var _idr = Build_IdRect();
+                var _m1 = _c.title_stk.menus[0];
+                Scenario_Check("shots_s2_the_language_is_" + _tag, Loc_GetLanguage() == _lang);
+                switch (_scene) {
+                    case "title":
+                        Scenario_Check("shots_s2_title_menu_inside_the_gui_" + _tag, Scenario_S2Inside(_m1.rect, _mt), json_stringify(_m1.rect));
+                        Scenario_Check("shots_s2_title_build_id_clear_of_the_menu_" + _tag, !Test_RectsOverlap(_idr, _m1.rect), json_stringify(_idr) + " vs " + json_stringify(_m1.rect));
+                        var _cr = _c.title_card_rect;
+                        Scenario_Check("shots_s2_title_card_is_shown_" + _tag, _c.title_card.kind == "run" && Scenario_S2Inside(_cr, _mt), json_stringify(_cr));
+                        Scenario_Check("shots_s2_title_card_clear_of_the_menu_and_the_build_id_" + _tag, !Test_RectsOverlap(_cr, _m1.rect) && !Test_RectsOverlap(_cr, _idr), json_stringify(_cr));
+                        Scenario_Check("shots_s2_title_has_five_rows_" + _tag, array_length(_m1.items) == 5 && _m1.items[0].id == "continue" && _m1.cursor == 0);
+                        var _pb = _c.title_btn.profile;   // D175: the profile button, lower left: inside the picture, clear of the menu, the card and the build id
+                        Scenario_Check("shots_s2_title_profile_button_inside_the_gui_" + _tag, Scenario_S2Inside(_pb, _mt), json_stringify(_pb));
+                        Scenario_Check("shots_s2_title_profile_button_clear_of_the_menu_the_card_and_the_build_id_" + _tag, !Test_RectsOverlap(_pb, _m1.rect) && !Test_RectsOverlap(_pb, _cr) && !Test_RectsOverlap(_pb, _idr), json_stringify(_pb) + " vs " + json_stringify(_m1.rect) + " " + json_stringify(_cr));
+                        var _cb2 = _c.title_btn.codex;   // D175: the Codex button above it
+                        Scenario_Check("shots_s2_title_codex_button_inside_the_gui_" + _tag, Scenario_S2Inside(_cb2, _mt), json_stringify(_cb2));
+                        Scenario_Check("shots_s2_title_codex_button_clear_of_the_menu_the_card_the_build_id_and_the_profile_button_" + _tag, !Test_RectsOverlap(_cb2, _m1.rect) && !Test_RectsOverlap(_cb2, _cr) && !Test_RectsOverlap(_cb2, _idr) && !Test_RectsOverlap(_cb2, _pb), json_stringify(_cb2) + " vs " + json_stringify(_pb));
+                        break;
+                    case "codex":
+                    case "codex_history":
+                        var _ct = Ui_StackTop(_cdx.stk);
+                        var _khr = _c.title_hint_rect;
+                        Scenario_Check("shots_s2_codex_is_the_expected_page_" + _tag, _ct.id == ((_scene == "codex") ? "title_codex" : "codex_history"), _ct.id);
+                        Scenario_Check("shots_s2_codex_list_inside_the_gui_" + _tag, Scenario_S2Inside(_ct.rect, _mt), json_stringify(_ct.rect));
+                        Scenario_Check("shots_s2_codex_details_inside_the_gui_" + _tag, Scenario_S2Inside(_ct.det_rect, _mt), json_stringify(_ct.det_rect));
+                        Scenario_Check("shots_s2_codex_list_and_details_do_not_overlap_" + _tag, !Test_RectsOverlap(_ct.rect, _ct.det_rect), json_stringify(_ct.rect) + " vs " + json_stringify(_ct.det_rect));
+                        Scenario_Check("shots_s2_codex_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_khr, _mt), json_stringify(_khr));
+                        Scenario_Check("shots_s2_codex_key_line_clear_of_the_panels_and_the_build_id_" + _tag, !Test_RectsOverlap(_khr, _ct.rect) && !Test_RectsOverlap(_khr, _ct.det_rect) && !Test_RectsOverlap(_khr, _idr), json_stringify(_khr));
+                        Scenario_Check("shots_s2_codex_build_id_clear_of_the_panels_" + _tag, !Test_RectsOverlap(_idr, _ct.rect) && !Test_RectsOverlap(_idr, _ct.det_rect));
+                        if (_scene == "codex_history") Scenario_Check("shots_s2_codex_history_lists_three_runs_" + _tag, array_length(_ct.items) == 3 && _ct.items[0].label == Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(DB_PlayerClass(CLASS_ARCHER).name), n: "9" }), _ct.items[0].label);
+                        break;
+                    case "name":
+                        var _nr = _c.title_name_rects;
+                        Scenario_Check("shots_s2_name_entry_is_open_" + _tag, is_struct(_nent) && _nent.e.text == "ALEX");
+                        Scenario_Check("shots_s2_name_panel_inside_the_gui_" + _tag, Scenario_S2Inside(_nr.panel, _mt), json_stringify(_nr.panel));
+                        Scenario_Check("shots_s2_name_build_id_clear_of_the_panel_" + _tag, !Test_RectsOverlap(_idr, _nr.panel), json_stringify(_idr) + " vs " + json_stringify(_nr.panel));
+                        var _cells_ok = (array_length(_nr.cells) == 36 + 3);
+                        for (var _ci = 0; _ci < array_length(_nr.cells); _ci++) {
+                            var _cc = _nr.cells[_ci];
+                            _cells_ok = _cells_ok && _cc.w > 0 && _cc.x >= _nr.panel.x && _cc.y >= _nr.panel.y && _cc.x + _cc.w <= _nr.panel.x + _nr.panel.w && _cc.y + _cc.h <= _nr.panel.y + _nr.panel.h;
+                        }
+                        Scenario_Check("shots_s2_name_grid_cells_inside_the_panel_" + _tag, _cells_ok);
+                        Scenario_Check("shots_s2_name_field_inside_the_panel_" + _tag, _nr.field.w > 0 && _nr.field.x >= _nr.panel.x && _nr.field.x + _nr.field.w <= _nr.panel.x + _nr.panel.w && _nr.field.y >= _nr.panel.y && _nr.field.y + _nr.field.h <= _nr.panel.y + _nr.panel.h, json_stringify(_nr.field));
+                        Scenario_Check("shots_s2_name_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_nr.hint, _mt), json_stringify(_nr.hint));
+                        Scenario_Check("shots_s2_name_key_line_clear_of_the_panel_and_the_build_id_" + _tag, !Test_RectsOverlap(_nr.hint, _nr.panel) && !Test_RectsOverlap(_nr.hint, _idr), json_stringify(_nr.hint) + " vs " + json_stringify(_nr.panel));
+                        break;
+                    case "profiles":
+                    case "load":
+                    case "overwrite":
+                        var _hr = _c.title_hint_rect;
+                        Scenario_Check("shots_s2_picker_is_open_" + _tag, _top.id == ((_scene == "load") ? "slots_load" : ((_scene == "profiles") ? "profiles" : "slots_overwrite")) && Ui_StackDepth(_c.title_stk) == 2);
+                        Scenario_Check("shots_s2_picker_inside_the_gui_" + _tag, Scenario_S2Inside(_top.rect, _mt), json_stringify(_top.rect));
+                        Scenario_Check("shots_s2_picker_details_inside_the_gui_" + _tag, Scenario_S2Inside(_top.det_rect, _mt), json_stringify(_top.det_rect));
+                        Scenario_Check("shots_s2_picker_shows_every_row_" + _tag, array_length(_top.items) == ((_scene == "profiles") ? 4 : 3) && array_length(_top.rects) == array_length(_top.items) && _top.rects[array_length(_top.items) - 1].w > 0, json_stringify(_top.rects));
+                        Scenario_Check("shots_s2_key_line_inside_the_gui_" + _tag, Scenario_S2Inside(_hr, _mt), json_stringify(_hr));
+                        Scenario_Check("shots_s2_key_line_clear_of_the_build_id_and_the_picker_" + _tag, !Test_RectsOverlap(_hr, _idr) && !Test_RectsOverlap(_hr, _top.rect) && !Test_RectsOverlap(_hr, _top.det_rect), json_stringify(_hr) + " vs " + json_stringify(_top.rect) + " " + json_stringify(_top.det_rect));
+                        Scenario_Check("shots_s2_build_id_clear_of_the_picker_" + _tag, !Test_RectsOverlap(_idr, _top.rect) && !Test_RectsOverlap(_idr, _top.det_rect));
+                        if (_lang == "ko" && _scene != "profiles") Scenario_Check("shots_s2_labels_are_korean_" + _tag, _top.items[0].label != "Save 1" && _top.items[0].label == Title_SlotName(0));
+                        if (_lang == "ko" && _scene == "profiles") Scenario_Check("shots_s2_labels_are_korean_" + _tag, _top.items[array_length(_top.items) - 1].label != "New Profile");
+                        break;
+                }
+                _s.shot = "shot_s2_" + _scene + "_" + _lang + "_" + string(window_get_width()) + "x" + string(window_get_height()) + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1063);
+            }
+            if (_s.t > 600) { Scenario_Check("shots_s2_scene_is_ready_" + _tag, false); Scenario_S2End(); }
+            break;
+        case 1063:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                Confirm_Close();
+                Scenario_ClearUi();
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.li++; }
+                if (_o.li >= array_length(_langs)) { _o.li = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_S2End();   // the end of the pictures: removes the files and the profiles the scenes made
+                } else {
+                    Scenario_Next(_s, 1060);
+                }
             }
             break;
     }

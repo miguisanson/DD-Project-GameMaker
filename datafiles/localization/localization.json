@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T09:53:40Z",
-    "row_count": 1211
+    "generated_at_utc": "2026-10-16T12:24:13Z",
+    "row_count": 1244
   },
   "default_lang": "en",
   "languages": [
@@ -887,6 +887,10 @@
     "class.skill.unknown": {
       "en": "???",
       "ko": "???"
+    },
+    "codex.btn": {
+      "en": "[k:tab_next] Codex",
+      "ko": "[k:tab_next] 도감"
     },
     "combat.foresee.attack": {
       "en": "a plain attack",
@@ -3432,9 +3436,73 @@
       "en": "Paused",
       "ko": "일시 정지"
     },
+    "profile.btn": {
+      "en": "[k:tab_prev] Profile",
+      "ko": "[k:tab_prev] 프로필"
+    },
     "profile.default_name": {
       "en": "Profile",
       "ko": "프로필"
+    },
+    "profile.delete.ask": {
+      "en": "Delete profile {name}? Its Codex, history and save files are lost.",
+      "ko": "프로필 {name}을(를) 삭제할까요? 도감, 기록, 저장 파일이 모두 사라집니다."
+    },
+    "profile.help.active": {
+      "en": "The profile in use. Its Codex, run history and story are the ones you see.",
+      "ko": "지금 쓰는 프로필입니다. 도감, 도전 기록, 이야기는 이 프로필의 것입니다."
+    },
+    "profile.help.new": {
+      "en": "Start a new profile. Its Codex and run history are empty and the story begins again.",
+      "ko": "새 프로필을 만듭니다. 도감과 도전 기록은 비어 있고 이야기는 처음부터 시작합니다."
+    },
+    "profile.help.other": {
+      "en": "Switch to this profile. Its Codex, run history, story and save files come with it.",
+      "ko": "이 프로필로 바꿉니다. 도감, 도전 기록, 이야기, 저장 파일도 함께 바뀝니다."
+    },
+    "profile.hint.create": {
+      "en": "[k:confirm] Create",
+      "ko": "[k:confirm] 만들기"
+    },
+    "profile.hint.switch": {
+      "en": "[k:confirm] Switch",
+      "ko": "[k:confirm] 바꾸기"
+    },
+    "profile.lbl.runs": {
+      "en": "Runs",
+      "ko": "도전 횟수"
+    },
+    "profile.name.hint_cancel": {
+      "en": "[k:back] Cancel",
+      "ko": "[k:back] 취소"
+    },
+    "profile.name.hint_pick": {
+      "en": "[k:confirm] Pick",
+      "ko": "[k:confirm] 선택"
+    },
+    "profile.name.info_kb": {
+      "en": "Up to 12 letters. Backspace deletes, Enter finishes.",
+      "ko": "최대 12자. Backspace로 지우고 Enter로 끝냅니다."
+    },
+    "profile.name.info_pad": {
+      "en": "Up to 12 letters. Pick them on the grid.",
+      "ko": "최대 12자. 칸에서 골라 입력하세요."
+    },
+    "profile.name.key_delete": {
+      "en": "Delete",
+      "ko": "삭제"
+    },
+    "profile.name.key_ok": {
+      "en": "OK",
+      "ko": "확인"
+    },
+    "profile.name.key_space": {
+      "en": "Space",
+      "ko": "띄어쓰기"
+    },
+    "profile.name.need": {
+      "en": "Enter a name.",
+      "ko": "이름을 입력하세요."
     },
     "profile.notice.corrupt": {
       "en": "Your profile file was damaged, so a fresh one was started. The damaged file was kept next to it.",
@@ -3443,6 +3511,18 @@
     "profile.notice.locked": {
       "en": "Your profile was saved by a different version of the game. It has been left untouched, and progress will not be saved this time.",
       "ko": "다른 버전의 게임에서 저장된 프로필입니다. 그대로 두며, 이번에는 진행 상황이 저장되지 않습니다."
+    },
+    "profile.row.new": {
+      "en": "New Profile",
+      "ko": "새 프로필"
+    },
+    "profile.title": {
+      "en": "Profiles",
+      "ko": "프로필"
+    },
+    "profile.val.active": {
+      "en": "Active",
+      "ko": "사용 중"
     },
     "run.continue.corrupt": {
       "en": "The run save is damaged and cannot be loaded.",
@@ -3548,6 +3628,26 @@
       "en": "Delete",
       "ko": "삭제"
     },
+    "save.delete.ask": {
+      "en": "Delete Save {n}? The run in it will be lost.",
+      "ko": "저장 {n}을(를) 삭제할까요? 그 안의 도전은 사라집니다."
+    },
+    "save.hint.delete": {
+      "en": "[k:tab_prev] Delete",
+      "ko": "[k:tab_prev] 삭제"
+    },
+    "save.hint.load": {
+      "en": "[k:confirm] Load",
+      "ko": "[k:confirm] 불러오기"
+    },
+    "save.hint.overwrite": {
+      "en": "[k:confirm] Overwrite",
+      "ko": "[k:confirm] 덮어쓰기"
+    },
+    "save.lbl.saved": {
+      "en": "Last Saved",
+      "ko": "마지막 저장"
+    },
     "save.legacy.notice": {
       "en": "Saves from the earlier version cannot be loaded in this one. They have been left untouched. Start a new run.",
       "ko": "이전 버전의 저장 파일은 이 버전에서 불러올 수 없습니다. 파일은 그대로 두었습니다. 새 도전을 시작하세요."
@@ -3563,6 +3663,38 @@
     "save.msg.no_saved_games_found": {
       "en": "No saved games found.",
       "ko": "저장된 게임이 없습니다."
+    },
+    "save.overwrite.ask": {
+      "en": "Overwrite Save {n}? The run in it will be lost.",
+      "ko": "저장 {n}을(를) 덮어쓸까요? 그 안의 도전은 사라집니다."
+    },
+    "save.overwrite.title": {
+      "en": "Overwrite which save file?",
+      "ko": "어느 저장 파일을 덮어쓸까요?"
+    },
+    "save.slot.cant": {
+      "en": "Cannot load",
+      "ko": "불러올 수 없음"
+    },
+    "save.slot.empty": {
+      "en": "Empty",
+      "ko": "비어 있음"
+    },
+    "save.slot.help_empty": {
+      "en": "No run is saved in this file.",
+      "ko": "이 파일에는 저장된 도전이 없습니다."
+    },
+    "save.slot.help_load": {
+      "en": "Pick up this run where you left it.",
+      "ko": "중단한 곳에서 이 도전을 이어갑니다."
+    },
+    "save.slot.help_over": {
+      "en": "A new game here replaces this run.",
+      "ko": "여기서 새 게임을 시작하면 이 도전은 사라집니다."
+    },
+    "save.slot.name": {
+      "en": "Save {n}",
+      "ko": "저장 {n}"
     },
     "save.slot.prefix": {
       "en": "Slot",
