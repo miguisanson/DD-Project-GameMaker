@@ -304,7 +304,8 @@ function EnemyPersist_BeginEncounter(_enemy_inst, _player_inst) {
 // _stolen: on an escape, what the enemy took from the player ([{ id, qty }], the battle copy's stolen_items). It stays on the map enemy (undefined keeps
 // what the record already holds); a win removes the record, and Battle_GrantRewards gives the loot back.
 function EnemyPersist_ResolveBattle(_defeated, _stolen = undefined) {
-    EnemyPersist_ClearSnapshot();   // hunt 5a: the fight is over (won or fled), whatever started it; the snapshot was for this fight only
+    global.encounter_resolved = true;   // review 6: the fight is over (won or fled). The snapshot is NOT cleared yet: Quit or close during "X has been slain." / "You ran away!" and the fade back must still
+                                        // save the run (D132, D141); the map's room-entry autosave clears it (EnemyPersist_AfterMapSave), a run's end or start does too
     var gs = GameState_Get();
     if (!variable_struct_exists(gs, "battle")) return;
     if (gs.battle.enemy_persist_id == "") return;
@@ -752,6 +753,7 @@ function Run_Finish(_result, _cause) {
 
     Story_CopyFlagsToProfile(prof, gs.flags);
     var entry = Run_MakeHistoryEntry(run, ch, Run_EndRoomName(_result), _result, _cause);
+    EnemyPersist_ClearSnapshot();   // review 6: a run that ends (a win included) leaves no snapshot behind
     Profile_RecordRun(prof, entry);
     if (is_struct(ch)) Skills_DiscoverAll(variable_struct_exists(ch, "skills") ? ch.skills : [], prof);   // D148: whatever the run ended with is remembered (a run saved before skill memory existed)
     Profile_Flush();
@@ -785,12 +787,13 @@ function Run_StartNew(_intro_dialogue = false, _seed = undefined) {
     Story_CopyProfileToFlags(prof, gs.flags);
 
     gs.run = Run_Create(seed);
+    EnemyPersist_ClearSnapshot();   // review 6: no snapshot of an earlier run's fight
 
     GameState_SetSelectedClass(CLASS_NOBODY);
     var ch = CharacterCreate_Player(CLASS_NOBODY);
     prof.runs_started += 1;
     Profile_Flush();
-    RunSave_DeleteUnlessKept();
+    RunSave_DeleteUnlessKept(undefined, undefined, true);   // review 6: a kept (newer or damaged) run.sav is moved aside before this run can save over it
 
     gs.player_ch = ch;
     GameState_SetPlayer(gs.player_ch);
@@ -832,12 +835,15 @@ function Run_AbandonSaved(_path = undefined) {
     RunSave_DeleteUnlessKept(_path, l.status);
 }
 
-// Starting a new run clears the run file, except a newer-version or damaged one: that is left where it is (D16: nothing is deleted that this build cannot read;
+// Starting a new run clears the run file, except a newer-version or damaged one: that is not deleted (D16: nothing is deleted that this build cannot read;
 // the player may switch between builds on one save folder). An old-format file is cleared too (review 1): left behind, Continue kept showing the old-slot notice after a new game.
 // _status: the status of the file when the caller has just read it.
-function RunSave_DeleteUnlessKept(_path = undefined, _status = undefined) {
+// _move_aside: true from Run_StartNew. The kept file is then moved to "run.kept-<unix time>.sav" (RunSave_KeepAside) so the new run, whose first autosave comes a frame after the room
+// change, saves to run.sav as usual without replacing it (review 6, finding 1). Run_AbandonSaved leaves it where it is: the run that follows moves it.
+function RunSave_DeleteUnlessKept(_path = undefined, _status = undefined, _move_aside = false) {
     var st = is_undefined(_status) ? RunSave_LoadFrom(_path).status : _status;
     if (st == "ok" || st == "missing" || st == "old") RunSave_Delete(_path);
+    else if (_move_aside) RunSave_KeepAside(_path);
 }
 
 // Title screen, New Game after the difficulty pick: the intro cutscene plays once per profile (D26); later runs start at once.
@@ -890,6 +896,7 @@ function Run_AutoSave() {
     } catch (_e) {
         show_debug_message("[RUN] autosave failed: " + string(_e.message));
     }
+    EnemyPersist_AfterMapSave();   // review 6: back on the map after a decided fight, the snapshot is spent
     global.run_last_autosave = current_time;
     return ok;
 }
@@ -909,18 +916,19 @@ function Run_AutosaveTick() {
 
 // D132: the window is closing (obj_game_controller's Game End event calls this). Saves the run the way an autosave would (never in a
 // cutscene, a transition or on the title). In a fight there is no save of the fight (D141): it writes the moment just before the encounter, the
-// same file Quit to title writes, so a chest or a card taken since the last autosave is kept. The test harness and scripted runs end the game on
+// same file Quit to title writes, so a chest or a card taken since the last autosave is kept. That holds after the fight is decided too (the
+// "slain" / "ran away" message and the fade back, review 6: the snapshot lives until the map has saved), and a fade does not stop it. The test harness and scripted runs end the game on
 // purpose, so they never save here; _ignore_harness lets the tests reach the rest of the rule, _in_room and _path let them stand in for the
 // battle room and a scratch file.
 function Run_SaveOnClose(_ignore_harness = false, _in_room = room, _path = undefined) {
     if (!_ignore_harness && (Test_HasFlag("-runtests") || (variable_global_exists("scn") && is_struct(global.scn)))) return false;
-    if (Transition_IsActive()) return false;
-    if (_in_room == rm_battle) {
+    if (_in_room == rm_battle) {   // review 6: before the transition guard. The snapshot is complete text, so the fades into and out of the fight do not matter to it, and the fade back to the map is still "before the map is back"
         if (!Run_IsActive()) return false;
         var gs = GameState_Get();
         if (!is_struct(gs.player_ch) || gs.player_ch.hp <= 0) return false;   // a dead player's run is over (the death flow ends it)
         return EnemyPersist_WriteSnapshot(_path);   // no snapshot (a fight that did not start from the map): the last autosave stays the run
     }
+    if (Transition_IsActive()) return false;
     return Run_AutoSave();
 }
 
@@ -1313,6 +1321,7 @@ function RunStats_Lines(_entry) {
 // D141: the run as it was just before a fight, kept as text (so nothing the fight does to the live structs can reach it). Taken by
 // EnemyPersist_BeginEncounter once the room state is saved; Quit to title in the fight writes it as the run save (no state of the fight is ever saved).
 function EnemyPersist_SnapshotRun() {
+    global.encounter_resolved = false;
     global.encounter_snapshot = json_stringify(RunSave_Build());
     return is_string(global.encounter_snapshot);
 }
@@ -1320,6 +1329,13 @@ function EnemyPersist_SnapshotRun() {
 // The snapshot belongs to one fight: forgotten when that fight ends (hunt 5a), so a later fight that did not begin on the map cannot write it.
 function EnemyPersist_ClearSnapshot() {
     global.encounter_snapshot = undefined;
+    global.encounter_resolved = false;
+}
+
+// The map has saved the run after a fight that was decided (Run_AutoSave, the room-entry save when the map is back): the outcome is in run.sav now, so the pre-fight snapshot has done its job (hunt 5a:
+// it belongs to one fight, a later fight that did not begin on the map must not write it). A snapshot of a fight still going (not decided) is left alone.
+function EnemyPersist_AfterMapSave() {
+    if (variable_global_exists("encounter_resolved") && global.encounter_resolved) EnemyPersist_ClearSnapshot();
 }
 
 function EnemyPersist_HasSnapshot() {

@@ -12797,21 +12797,35 @@ function Test_Suite_Hunt5a() {
     _gs.battle.enemy_room = rm_floor2;
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(true);
-    Test_False("hunt5a: a won fight clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a won fight keeps the snapshot while the message shows (review 6: a quit there must still save)", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: the map's save after a won fight clears the snapshot", EnemyPersist_HasSnapshot());
 
     // a fled fight from the map
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(false);
-    Test_False("hunt5a: a fled fight clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a fled fight keeps the snapshot while the message shows", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: the map's save after a fled fight clears the snapshot", EnemyPersist_HasSnapshot());
 
     // a fight that did not start from the map (no enemy to resolve) still ends
     _gs.battle.enemy_persist_id = "";
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(true);
-    Test_False("hunt5a: a won fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a won fight with no map enemy keeps the snapshot until the map has saved", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: and the map's save clears it", EnemyPersist_HasSnapshot());
     global.encounter_snapshot = "{}";
     EnemyPersist_ResolveBattle(false);
-    Test_False("hunt5a: a fled fight with no map enemy clears the snapshot", EnemyPersist_HasSnapshot());
+    Test_True("hunt5a: a fled fight with no map enemy keeps the snapshot until the map has saved", EnemyPersist_HasSnapshot());
+    EnemyPersist_AfterMapSave();
+    Test_False("hunt5a: and the map's save clears it too", EnemyPersist_HasSnapshot());
+    // a map save with a fight still going (not decided) leaves its snapshot alone
+    global.encounter_snapshot = "{}";
+    global.encounter_resolved = false;
+    EnemyPersist_AfterMapSave();
+    Test_True("hunt5a: a map save does not clear the snapshot of a fight that is not decided", EnemyPersist_HasSnapshot());
+    EnemyPersist_ClearSnapshot();
 
     // Quit used it: a second quit must not write it again
     var _gs2 = _gs;
@@ -13210,7 +13224,7 @@ function Test_SurfaceAlpha(_surf, _side) {
 
 // What the elite marks paint on top of the sprite's own pixels, and outside them: { inside, outside, bright } (bright = outside pixels that are fully opaque and exactly _col).
 function Test_EliteFxOverSprite(_spr, _img, _col) {
-    var _ring = Elite_FxRing(_spr, _img, 1, 1, 0, _col, c_white);
+    var _ring = Elite_FxRing(_spr, _img, 1, 1, 0, _col);
     var _side = _ring.r * 2;
     var _w = surface_get_width(_ring.surf);
     var _buf = buffer_create(_w * surface_get_height(_ring.surf) * 4, buffer_fixed, 1);

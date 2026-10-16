@@ -806,16 +806,20 @@ function Elite_FxDrawCount() {
     return variable_global_exists("elite_fx_drawn") ? global.elite_fx_drawn : 0;
 }
 
-// One elite's marks as a picture: the dark rim and the pulse-coloured outline round the sprite's own shape, drawn into a small surface. Returns { surf, r }: the sprite's origin is
-// at (r, r) in that surface, which is 2r square (a cached surface, so it can be larger; read only the 2r x 2r corner). Drawn on the map by Elite_DrawWorldFx.
-function Elite_FxRing(_spr, _img, _xs, _ys, _ang, _col, _blend) {
+// One elite's marks as a picture: the dark rim and the pulse-coloured outline round the sprite's own shape, drawn into a small surface, and then the sprite's own pixels cut out of it
+// (review 6, finding 4: the marks used to end with the sprite drawn again on top, after the room's darkness, so an elite stood at full brightness in a dark corner; the sprite is the
+// enemy's own draw, under the darkness like every other figure, and shows through the hole). Returns { surf, r }: the sprite's origin is at (r, r) in that surface, which is 2r square
+// (a cached surface, so it can be larger; read only the 2r x 2r corner). Drawn on the map by Elite_DrawWorldFx.
+function Elite_FxRing(_spr, _img, _xs, _ys, _ang, _col) {
     var _r = ceil(point_distance(0, 0, sprite_get_width(_spr) * abs(_xs), sprite_get_height(_spr) * abs(_ys))) + 3;
     var _surf = Elite_FxSurface(_r * 2);
     surface_set_target(_surf);
     draw_clear_alpha(c_black, 0);
     Elite_DrawRim(_spr, _img, _r, _r, _xs, _ys, _ang, UI_C_DARKEST, 1);
     Elite_DrawOutline(_spr, _img, _r, _r, _xs, _ys, _ang, _col, 1);
-    draw_sprite_ext(_spr, _img, _r, _r, _xs, _ys, _ang, _blend, 1);
+    gpu_set_blendmode_ext_sepalpha(bm_zero, bm_one, bm_zero, bm_inv_src_alpha);   // colour untouched, alpha * (1 - source alpha): the sprite's pixels take the marks away
+    draw_sprite_ext(_spr, _img, _r, _r, _xs, _ys, _ang, c_white, 1);
+    gpu_set_blendmode(bm_normal);
     surface_reset_target();
     return { surf: _surf, r: _r };
 }
@@ -831,7 +835,8 @@ function Elite_FxSurface(_side) {
     return global.elite_fx_surf;
 }
 
-// Round every live elite (D156, H13a): the sprite's own shape one pixel out in the pulse colour with a dark rim outside it, then the sprite on top again (the merchant's glow does the same; the layer script runs after the instances).
+// Round every live elite (D156, H13a): the sprite's own shape one pixel out in the pulse colour with a dark rim outside it. The marks are drawn after the room's darkness (they stay bright);
+// the sprite itself is not drawn again (review 6).
 function Elite_DrawWorldFx() {
     if (!Fx_IsWorldPass()) return;
     if (!instance_exists(obj_enemy)) return;
@@ -840,7 +845,7 @@ function Elite_DrawWorldFx() {
     if (!variable_global_exists("elite_fx_drawn")) global.elite_fx_drawn = 0;
     with (obj_enemy) {
         if (defeated || !variable_instance_exists(id, "elite_mod") || elite_mod == "" || sprite_index == -1) continue;
-        var ring = Elite_FxRing(sprite_index, image_index, image_xscale, image_yscale, image_angle, col, image_blend);
+        var ring = Elite_FxRing(sprite_index, image_index, image_xscale, image_yscale, image_angle, col);
         var side = ring.r * 2;
         draw_surface_part_ext(ring.surf, 0, 0, side, side, x - ring.r, y - ring.r, 1, 1, c_white, image_alpha);
         global.elite_fx_drawn++;
