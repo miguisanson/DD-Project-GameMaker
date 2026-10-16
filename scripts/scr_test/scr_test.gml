@@ -375,13 +375,13 @@ function Test_Suite_Stats() {
     _staffer.inventory = Inv_Add(_staffer.inventory, 7, 1);
     Test_True("Equip: Wooden Staff equips", Equip_Item(_staffer, 7));
     Test_Eq("D22 weapon power: Wooden Staff (power 3) is the equipped weapon power", Combat_WeaponPower(_staffer), 3);
-    Test_Eq("D22 weapon power: no weapon counts as 5 (fists; D186, was 2)", Combat_WeaponPower(CharacterCreate_Player(CLASS_MAGE)), 5);
+    Test_Eq("D22 weapon power: no weapon counts as 2 (fists)", Combat_WeaponPower(CharacterCreate_Player(CLASS_MAGE)), 2);
     // D22: the same skill hits harder with a weapon equipped. Fireball (power 6) on a Stranger (DEF14), Mage MAG12: fists 2*(6+1)=14 -> 6.46 = 6; Wooden Staff 2*(6+1.5)=15 -> 6.92 = 7.
     var _bare = CharacterCreate_Player(CLASS_MAGE); _bare.mp = 99;
     var _armed = _staffer; _armed.mp = 99;
     var _fb_bare = Skill_Use(_bare, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
     var _fb_armed = Skill_Use(_armed, EnemyCreate(ENEMY_STRANGER), SKILL_FIREBALL);
-    Test_Eq("D22 Fireball without a weapon deals 8 (skill power 6 + fists 5 -> 17 vs DEF 14; D186, was 6)", _fb_bare.dmg, 8);
+    Test_Eq("D22 Fireball without a weapon deals 6", _fb_bare.dmg, 6);
     Test_Eq("D22 Fireball with the Wooden Staff deals 7", _fb_armed.dmg, 7);
     // STAT-12 / D76: fixed growth plus ONE free point per level. Spending it: Level_ApplyFreePoint.
     var _c = CharacterCreate_Player(CLASS_KNIGHT);
@@ -18473,7 +18473,7 @@ function Test_Suite_R3Balance() {
     Test_Eq("r3balance: Knight starts at SPD 9", CharacterCreate_Player(CLASS_KNIGHT).stats.spd, 9);
     Test_Eq("r3balance: Nobody starts at ATK 10 DEF 9 SPD 12", string(CharacterCreate_Player(CLASS_NOBODY).stats.atk) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.def) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.spd), "10 9 12");
     Test_Eq("r3balance: Archer starts at ATK 8 SPD 12", string(CharacterCreate_Player(CLASS_ARCHER).stats.atk) + " " + string(CharacterCreate_Player(CLASS_ARCHER).stats.spd), "8 12");
-    Test_Eq("r3balance: an unarmed character hits with weapon power 5 (it was 2; only the Nobody fights unarmed)", COMBAT_UNARMED_POWER, 5);
+    Test_Eq("r3balance (retuned): fists stay at weapon power 2 (a bigger number lifts every class that has not found a weapon yet)", COMBAT_UNARMED_POWER, 2);
 }
 
 // D191 (BREAK harder): a multi-hit skill fills the meter like ONE hit; a stun skill fills x1.5 (not x2). Expected values by hand from the owner's rule.
@@ -18521,6 +18521,11 @@ function Test_R3BalanceTurns() {
     var _same = true;
     for (var _m = 0; _m < 9; _m++) { if (_pv[_m] != _play[_m]) _same = false; }
     Test_True("r3balance D192: the preview shows the order that is played", _same);
+    // a timeline of one fighter has nobody to hand a third turn to: it simply goes on
+    var _solo = Turn_New([Turn_Fighter(TL_PLAYER, 10)]);
+    var _solo_ok = true;
+    for (var _q = 0; _q < 6; _q++) { if (Turn_Next(_solo) != TL_PLAYER) _solo_ok = false; }
+    Test_True("r3balance D192: a one-fighter timeline keeps giving its turn to that fighter", _solo_ok);
     // a stun still pushes back a full turn
     var _tl4 = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
     Turn_Next(_tl4);

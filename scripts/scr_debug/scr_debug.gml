@@ -6747,7 +6747,7 @@ function Scenario_StepSmokeEconomy(_s) {
             if (_ec.bc_ok && room != rm_battle && Scenario_FloorReady(rm_floor1) && !variable_struct_exists(_ec, "won")) {
                 _ec.won = true;
                 var _paid = _gs.run.gold - _ec.gold_e0;
-                Scenario_Check("elite_pays_double_gold", _paid >= 18 && _paid <= 30, "paid=" + string(_paid));
+                Scenario_Check("elite_pays_double_gold", _paid >= 5 && _paid <= 9, "paid=" + string(_paid));   // D193: an elite Slime pays 7 +-25% (it was 24: 18..30)
                 Scenario_Check("elite_leaves_a_card_pick_owed", _gs.player_ch.card_picks == _ec.picks_e0 + 1, "picks=" + string(_gs.player_ch.card_picks));
             }
             if (variable_struct_exists(_ec, "won")) Scenario_CardsTalk(_s);
