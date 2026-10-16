@@ -18526,6 +18526,16 @@ function Test_R3BalanceTurns() {
     var _solo_ok = true;
     for (var _q = 0; _q < 6; _q++) { if (Turn_Next(_solo) != TL_PLAYER) _solo_ok = false; }
     Test_True("r3balance D192: a one-fighter timeline keeps giving its turn to that fighter", _solo_ok);
+    // R-022's setup: SPD 1 against SPD 99999 with the enemy's gauge pushed far below zero; the player takes two turns, the third goes to the enemy once it has filled (1000 ticks), by hand P P E P P E
+    var _tl5 = Turn_New([Turn_Fighter(TL_PLAYER, 1), Turn_Fighter(TL_ENEMY, 99999)]);
+    Turn_Push(_tl5, TL_ENEMY, 100000000);
+    var _o5 = "";
+    for (var _r = 0; _r < 6; _r++) _o5 += (Turn_Next(_tl5) == TL_PLAYER) ? "P" : "E";
+    Test_Eq("r3balance D192: SPD 1 against a far-pushed SPD 99999 plays P P E P P E", _o5, "PPEPPE");
+    var _tl6 = Turn_New([Turn_Fighter(TL_PLAYER, 1), Turn_Fighter(TL_ENEMY, 60)]);
+    Turn_Push(_tl6, TL_ENEMY, 100000000);
+    var _pv6 = Turn_Preview(_tl6, 5);
+    Test_Eq("r3balance D192: the strip of that far-pushed enemy is P P E P P", string(_pv6[0]) + string(_pv6[1]) + string(_pv6[2]) + string(_pv6[3]) + string(_pv6[4]), "00100");
     // a stun still pushes back a full turn
     var _tl4 = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);
     Turn_Next(_tl4);

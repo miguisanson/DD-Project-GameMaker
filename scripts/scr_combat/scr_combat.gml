@@ -597,7 +597,7 @@ function Turn_Next(_tl) {
     var ready = false;
     for (var i = 0; i < n; i++) { if (fs[i].id != blocked && fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
     if (!ready) {
-        var ticks = 1000000;
+        var ticks = 1000000000000;   // (D192: the only fighter that can act may be one that is pushed back very far)
         for (var j = 0; j < n; j++) {
             if (fs[j].id == blocked) continue;
             var rate = TURN_SPD_BASE + fs[j].spd;
