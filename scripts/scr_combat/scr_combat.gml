@@ -2880,7 +2880,7 @@ function Battle_SkillDetails(_skill, _cost = -1, _pv = undefined) {
         array_push(lines, { label: Loc_T("card.lbl.power", "Power"), value: string(round(_skill.power)) });
         if (variable_struct_exists(_skill, "hits") && _skill.hits > 1) array_push(lines, { label: Loc_T("battle.det.hits", "Hits"), value: string(round(_skill.hits)) });
     }
-    array_push(lines, { label: Loc_T("card.lbl.mp", "MP"), value: string((_cost >= 0) ? _cost : round(_skill.mp_cost)) });
+    array_push(lines, { label: Loc_T("card.lbl.mp", "MP"), value: string((_cost >= 0) ? _cost : round(_skill.mp_cost)), keep: true, dup: true });   // dup: the list row shows the MP too
     if (_skill.status != -1) {
         var poison = (_skill.status == STATUS_POISON);
         if (poison && variable_struct_exists(_skill, "status_stacks")) array_push(lines, { label: Loc_T("card.lbl.stacks", "Stacks"), value: string(round(_skill.status_stacks)) });
@@ -3072,10 +3072,15 @@ function Battle_MenusLayout(_bc) {
     _bc.ui_item.layout.panel_w = z.right.w;
     _bc.ui_item.layout.y_bottom = z.list_bottom;
     // G10 (D129): the details panel stands above the list and grows upward; it stops just under the enemy (the list and the panel give way, Ui_MenuDraw)
+    // R-108: the prompt line stands right above the details panel, so the floor is the enemy's bottom plus the hint's height, so that neither covers the enemy
     var er = Battle_EnemyRect(_bc);
-    var floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;
-    _bc.ui_skill.layout.det_floor_y = floor_y;
-    _bc.ui_item.layout.det_floor_y = floor_y;
+    var ms = [_bc.ui_skill, _bc.ui_item];
+    var sts = [BSTATE_SKILL_MENU, BSTATE_ITEM_MENU];
+    for (var i = 0; i < 2; i++) {
+        var hint_h = Battle_ListHintRect({ x: 0, y: 0, w: ms[i].layout.panel_w, h: 0 }, sts[i]).h;
+        ms[i].layout.det_floor_y = (er.w > 0 && er.h > 0) ? er.y + er.h + ((hint_h > 0) ? hint_h + 2 * Ui_Px() : Ui_Px()) : -1;
+        ms[i].layout.det_floor_alt = (er.w > 0 && er.h > 0) ? er.y + er.h + Ui_Px() : -1;   // the floor when the hint is left out because nothing else makes room
+    }
 }
 
 function Battle_ItemSig(_p) {
@@ -3146,9 +3151,9 @@ function Battle_HintLabels(_state) {
 
 // Where a list's prompt line stands: right-aligned just above the details panel _det (a rect { x, y, w, h }); { x, y, w, h, txt } or a zero rect when the state has no hint
 // or the panel is not up. Pure (the draw and the checks read it).
-function Battle_ListHintRect(_det, _state) {
+function Battle_ListHintRect(_det, _state, _hidden = false) {
     var none = { x: 0, y: 0, w: 0, h: 0, txt: "" };
-    if (_det.w <= 0) return none;
+    if (_det.w <= 0 || _hidden) return none;
     var hints = Battle_HintLabels(_state);
     if (array_length(hints) == 0) return none;
     var mt = Ui_Metrics();
@@ -3159,7 +3164,7 @@ function Battle_ListHintRect(_det, _state) {
 
 // The prompt line of a list (C4's glyphs: the keyboard key or the pad button of the device in use), right-aligned just above the details panel.
 function Battle_DrawListHint(_m, _state) {
-    var hr = Battle_ListHintRect(_m.det_rect, _state);
+    var hr = Battle_ListHintRect(_m.det_rect, _state, _m.hint_hidden);
     if (hr.w <= 0) return;
     Prompt_RichDraw(hr.x, hr.y, hr.txt, _m.det_rect.w, UI_C_LIGHT, fa_left, Ui_MenuAlpha(_m, current_time));
 }
@@ -4161,8 +4166,8 @@ function Battle_PreviewHitsText(_list) {
 function Battle_PreviewLines(_pv) {
     if (!is_struct(_pv)) return [];
     return [
-        { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewHitsText(_pv.ok_hits) },
-        { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewHitsText(_pv.perfect_hits) }
+        { label: Loc_T("battle.det.damage", "Damage"), value: Battle_PreviewHitsText(_pv.ok_hits), keep: true },   // R-108: the lines kept when the panel gives way
+        { label: Loc_T("battle.det.perfect", "Perfect"), value: Battle_PreviewHitsText(_pv.perfect_hits), keep: true }
     ];
 }
 

@@ -15684,12 +15684,14 @@ function Test_Suite_R3FixDet() {
     Test_RunSuite("R3FixDet.pairs", Test_R3FixDetPairs);
 }
 
-// The lines a battle details panel must always keep (by label): Damage, Perfect and MP for a skill; the first line for anything else (an item).
-function Test_R3FixDetKeeps(_lines, _is_skill) {
+// The lines a battle details panel keeps (by label): Damage, Perfect and MP for a skill; the first line for anything else (an item). In the last resort (nothing else makes room: one list row,
+// the hint left out) the MP line goes too (the list row shows it) and an item keeps no line.
+function Test_R3FixDetKeeps(_lines, _is_skill, _last = false) {
     var _out = [];
     for (var _i = 0; _i < array_length(_lines); _i++) {
         var _lb = _lines[_i].label;
         var _keep = _is_skill ? (_lb == Loc_T("battle.det.damage", "Damage") || _lb == Loc_T("battle.det.perfect", "Perfect") || _lb == Loc_T("card.lbl.mp", "MP")) : (_i == 0);
+        if (_last && (!_is_skill || _lb == Loc_T("card.lbl.mp", "MP"))) _keep = false;
         if (_keep) array_push(_out, _lb);
     }
     return _out;
@@ -15709,6 +15711,9 @@ function Test_R3FixDetLists() {
     var _sizes = TextFit_Sizes();
     var _f = { enemy: "", player: "", screen: "", hint: "", keep: "", order: "", rows: "", setup: "" };
     var _n = 0;
+    var _hid = 0;
+    var _l2 = 0;
+    var _stp = 0;
     for (var _l = 0; _l < 2; _l++) {
         for (var _z = 0; _z < array_length(_sizes); _z++) {
             TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
@@ -15736,7 +15741,7 @@ function Test_R3FixDetLists() {
                     var _it = _m.items[_i];
                     var _mc = Ui_MenuMeasure(_m, _mt);
                     var _g = Ui_MenuGeom(_m, _mt, _mc, 1);
-                    var _hr = Battle_ListHintRect(_g.det_rect, _state);
+                    var _hr = Battle_ListHintRect(_g.det_rect, _state, _g.hint_hidden);
                     var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " " + ((_k == 0) ? "skill " : "item ") + string(_it.label) + "; ";
                     _n++;
                     var _rects = [["list", _g.rect], ["details", _g.det_rect], ["hint", _hr]];
@@ -15747,20 +15752,24 @@ function Test_R3FixDetLists() {
                         if (Test_RectsOverlap(_r, _zn.player)) _f.player += _tag + _rects[_q][0] + "; ";
                         if (_r.x < 0 || _r.y < 0 || _r.x + _r.w > _gw || _r.y + _r.h > _gh) _f.screen += _tag + _rects[_q][0] + json_stringify(_r) + "; ";
                     }
-                    if (_g.det_rect.w > 0 && _hr.w <= 0) _f.hint += _tag + "no hint; ";
-                    // what the panel kept: the sentence, and the lines in priority order
+                    if (_g.det_rect.w > 0 && _hr.w <= 0 && !_g.hint_hidden) _f.hint += _tag + "no hint; ";
+                    // what the panel kept: the sentence, and the lines in priority order (level 0 all, 1 the kept ones, 2 the last resort)
                     var _full = Test_R3FixDetLabels(_it.lines);
-                    var _shown = Test_R3FixDetLabels(_g.lines_shown);
-                    var _keeps = Test_R3FixDetKeeps(_it.lines, _k == 0);
-                    var _missing = false;
-                    for (var _w = 0; _w < array_length(_keeps); _w++) if (!Card_ArrayHas(_shown, _keeps[_w])) _missing = true;
-                    if (_g.det_rect.w <= 0 || _missing) _f.keep += _tag + "shown=" + json_stringify(_shown) + " keep=" + json_stringify(_keeps) + "; ";
-                    var _dropped = (array_length(_shown) < array_length(_full));
-                    if (_dropped && json_stringify(_shown) != json_stringify(_keeps)) _f.order += _tag + "shown=" + json_stringify(_shown) + " keep=" + json_stringify(_keeps) + "; ";
+                    var _shown = json_stringify(Test_R3FixDetLabels(_g.lines_shown));
+                    var _want = (_g.lines_level == 0) ? json_stringify(_full) : json_stringify(Test_R3FixDetKeeps(_it.lines, _k == 0, _g.lines_level >= 2));
+                    if (_g.det_rect.w <= 0 || _shown != _want) _f.keep += _tag + "level " + string(_g.lines_level) + " shown=" + _shown + " want=" + _want + "; ";
                     var _normal_rows = min(3, array_length(_m.items));
                     var _reduced = (_g.rows_vis < _normal_rows);
-                    if (_reduced && (json_stringify(_shown) != json_stringify(_keeps) || (variable_struct_exists(_it, "seq") && array_length(_it.seq) > 0 && !_g.seq_drop))) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " shown=" + json_stringify(_shown) + "; ";
+                    var _seq = (variable_struct_exists(_it, "seq") && array_length(_it.seq) > 0);
+                    if (_reduced && (_g.lines_level < 1 || (_seq && !_g.seq_drop))) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " level " + string(_g.lines_level) + "; ";
                     if (_g.gap < _mt.margin && _g.rows_vis != 1) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
+                    if (_g.hint_hidden && (_g.rows_vis != 1 || _g.lines_level < 1)) _f.order += _tag + "hint left out with " + string(_g.rows_vis) + " rows, level " + string(_g.lines_level) + "; ";
+                    if (_g.lines_level >= 2 && !(_g.hint_hidden && _g.rows_vis == 1)) _f.order += _tag + "last-resort lines before the hint and the rows gave way; ";
+                    if (_g.lines_level >= 1 && _seq && !_g.seq_drop && _g.rows_vis < _normal_rows) _f.order += _tag + "arrows kept while rows go; ";
+                    if ((_g.det_step > 0 || _g.det_tight) && !(_g.hint_hidden && _g.rows_vis == 1 && _g.lines_level >= 2)) _f.order += _tag + "smaller type before the rest gave way; ";
+                    if (_g.hint_hidden) _hid++;
+                    if (_g.det_step > 0) _stp++;
+                    if (_g.lines_level >= 2) _l2++;
                 }
                 if (array_length(_m.items) < 3) _f.setup += _langs[_l] + " " + string(_sizes[_z][0]) + " list " + string(_k) + " has " + string(array_length(_m.items)) + " rows; ";
             }
@@ -15774,9 +15783,10 @@ function Test_R3FixDetLists() {
     Test_Eq("r3fixdet lists: nor on the player panel", _f.player, "");
     Test_Eq("r3fixdet lists: all of them are on screen", _f.screen, "");
     Test_Eq("r3fixdet lists: the hint stays with the details panel", _f.hint, "");
-    Test_Eq("r3fixdet lists: the details panel always keeps its sentence and its Damage / Perfect / MP lines", _f.keep, "");
-    Test_Eq("r3fixdet lists: when lines are dropped only the least important are left out (all of them go before one that matters)", _f.order, "");
+    Test_Eq("r3fixdet lists: the details panel keeps its sentence and its lines in priority order: Damage / Perfect / MP stay while anything else goes first (only the last resort drops the MP the row also shows)", _f.keep, "");
     Test_Eq("r3fixdet lists: the list shows fewer rows only after the details dropped what they could", _f.rows, "");
+    Test_Eq("r3fixdet lists: the order of giving way is lines, arrows, rows, then the hint, then the last-resort lines, then the smaller type", _f.order, "");
+    Test_True("r3fixdet lists: (info) the hint is left out in " + string(_hid) + " of " + string(_n) + " layouts, the last-resort lines in " + string(_l2) + ", the smaller type in " + string(_stp), true);
     TextFit_End(_s);
 }
 
@@ -15794,7 +15804,15 @@ function Test_R3FixDetPairs() {
     Test_Eq("r3fixdet pairs: both fit a row: one row of two", array_length(_wide.rows), 1);
     Test_Eq("r3fixdet pairs: with two cells", array_length(_wide.rows[0].cells), 2);
     Test_Eq("r3fixdet pairs: and it is one text row tall", _wide.h, _mt.line_h + _p);
-    var _in = 2 * _nd + 3 * _p;   // the columns fit Damage 17 but not Perfect 22
+    var _mid = Ui_DetailsPlan(_lines, _nd + _np + 3 * _p, 2, _mt);   // equal columns are too narrow for Perfect 22 but the two pairs fit one row at their own widths
+    Test_Eq("r3fixdet pairs: the pairs fit one row at their own width: one row", array_length(_mid.rows), 1);
+    if (array_length(_mid.rows) == 1) {
+        Test_Eq("r3fixdet pairs: Damage 17 is as wide as it needs, at the left edge", _mid.rows[0].cells[0].x + _mid.rows[0].cells[0].w, _nd);
+        Test_Eq("r3fixdet pairs: Perfect 22 ends at the right edge", _mid.rows[0].cells[1].x + _mid.rows[0].cells[1].w, _nd + _np + 3 * _p);
+        Test_Eq("r3fixdet pairs: and is as wide as it needs", _mid.rows[0].cells[1].w, _np);
+        Test_Eq("r3fixdet pairs: one text row tall", _mid.h, _mt.line_h + _p);
+    }
+    var _in = 2 * _nd + 3 * _p;   // the columns fit Damage 17 but not Perfect 22 (and the two pairs together do not fit one row)
     var _tight = Ui_DetailsPlan(_lines, _in, 2, _mt);
     Test_Eq("r3fixdet pairs: Perfect does not fit its column: the pair goes on two rows", array_length(_tight.rows), 2);
     Test_True("r3fixdet pairs: Damage 17 is one row, Perfect 22 the next", array_length(_tight.rows) == 2 && _tight.rows[0].cells[0].i == 0 && _tight.rows[1].cells[0].i == 1);
