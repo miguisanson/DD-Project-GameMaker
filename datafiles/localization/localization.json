@@ -3,7 +3,7 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T01:06:49Z",
+    "generated_at_utc": "2026-10-16T01:06:58Z",
     "row_count": 1207
   },
   "default_lang": "en",
@@ -537,7 +537,7 @@
       "ko": "흔들림 없는 손"
     },
     "card.pas.venom_coat.line": {
-      "en": "[t]Poison[/t] you apply adds {n} extra stack.",
+      "en": "[t]Poison[/t] you inflict adds {n} extra stack.",
       "ko": "내가 거는 [t]독[/t]이 {n}중첩 더 쌓인다."
     },
     "card.pas.venom_coat.name": {
@@ -825,20 +825,20 @@
       "ko": "없음"
     },
     "class.line.archer": {
-      "en": "A scout of the dark tunnels. Quick and sharp: poison and double shots.",
-      "ko": "어두운 터널의 척후병. 빠르고 날카롭습니다. 독과 연속 사격."
+      "en": "A scout of the dark. Quick, with [t]Poison[/t] and double shots.",
+      "ko": "어둠 속의 척후병. 빠르고, [t]독[/t]과 연속 사격을 쓴다."
     },
     "class.line.knight": {
-      "en": "Guard of the fallen keep. Hits hard, takes hits harder. Stands firm.",
-      "ko": "무너진 보루의 수호병. 강하게 치고 더 단단히 버팁니다."
+      "en": "Guard of a keep that fell. Hits hard, slow to be hurt.",
+      "ko": "무너진 보루의 수호병. 세게 치고 좀처럼 다치지 않는다."
     },
     "class.line.mage": {
-      "en": "A scholar who heard the dark. Frail, but great magic and mana.",
-      "ko": "어둠의 소리를 들은 학자. 약하지만 마법과 마나가 대단합니다."
+      "en": "A scholar the dark read back. Frail; spells hit hard.",
+      "ko": "어둠이 읽어 낸 학자. 약하지만 마법이 강하다."
     },
     "class.line.nobody": {
-      "en": "No name, no past, no skills. Only blade, passives and items.",
-      "ko": "이름도 과거도 스킬도 없습니다. 칼과 패시브와 아이템뿐."
+      "en": "No name, no past, no skills. A blade and your pockets.",
+      "ko": "이름도 과거도 스킬도 없다. 칼 한 자루와 주머니뿐이다."
     },
     "class.name.archer": {
       "en": "Archer",
@@ -1085,8 +1085,8 @@
       "ko": "상처가 아물어 갑니다!"
     },
     "combat.msg.skill.use.skill_snuff": {
-      "en": "Your enchantments are snuffed out!",
-      "ko": "당신의 강화 효과가 꺼졌습니다!"
+      "en": "Your buffs are snuffed out!",
+      "ko": "당신의 버프가 꺼졌습니다!"
     },
     "combat.msg.skill_crit": {
       "en": "Critical skill! {dmg} damage!",
@@ -2181,12 +2181,12 @@
       "ko": "적"
     },
     "help.line.break": {
-      "en": "Good hits fill the stagger meter. When it is full the enemy loses a turn and takes +{pct}% damage.",
-      "ko": "좋은 공격은 경직 게이지를 채웁니다. 가득 차면 적이 한 턴을 잃고 피해를 {pct}% 더 받습니다."
+      "en": "Good hits fill the [t]stagger[/t] meter. When it is full the enemy loses a turn and takes +{pct}% damage.",
+      "ko": "좋은 공격은 [t]경직[/t] 게이지를 채웁니다. 가득 차면 적이 한 턴을 잃고 피해를 {pct}% 더 받습니다."
     },
     "help.line.crit": {
-      "en": "A critical hit deals {mult} times the damage. Take Aim and some gear raise the odds.",
-      "ko": "치명타는 피해를 {mult}배로 줍니다. 조준과 일부 장비가 확률을 높입니다."
+      "en": "A critical hit deals {mult} times the damage. [t]Take Aim[/t] and some gear raise the odds.",
+      "ko": "치명타는 피해를 {mult}배로 줍니다. [t]조준[/t]과 일부 장비가 확률을 높입니다."
     },
     "help.line.elite": {
       "en": "A marked, tougher enemy with a special trait. Its rewards are better.",
@@ -2205,7 +2205,7 @@
       "ko": "스킬을 쓰면 줄어드는 마력입니다. 물약과 휴식으로 회복합니다."
     },
     "help.line.ok": {
-      "en": "Press on the bar but off the middle for normal damage.",
+      "en": "Press on the bar, off the middle, for normal damage.",
       "ko": "막대 위에서 가운데를 벗어나 누르면 보통 피해를 줍니다."
     },
     "help.line.perfect": {
@@ -2641,35 +2641,35 @@
       "ko": "[t]약함[/t] 판정이 [t]무난[/t]으로 처리됩니다 (턴당 1회)"
     },
     "item.passive.desc.2": {
-      "en": "First hit: -1 [t]DEF[/t] for 2 turns",
-      "ko": "첫 타격: 2턴 동안 [t]DEF[/t] -1"
+      "en": "Your first hit cuts the enemy's [t]DEF[/t] by 1 for 2 turns",
+      "ko": "첫 타격이 적의 [t]DEF[/t]를 2턴 동안 1 낮춘다"
     },
     "item.passive.desc.20": {
-      "en": "First hit -3 damage (once per battle)",
+      "en": "The first hit you take deals 3 less damage (once per battle)",
       "ko": "첫 피격 피해 -3 (전투마다)"
     },
     "item.passive.desc.21": {
-      "en": "After a hit: next hit -40% (2-turn cooldown)",
+      "en": "After you are hit, the next hit deals 40% less (2-turn cooldown)",
       "ko": "피격 후 다음 피격 피해 -40% (재사용 2턴)"
     },
     "item.passive.desc.22": {
-      "en": "-30% damage from big hits",
+      "en": "Big hits deal 30% less damage",
       "ko": "큰 피해 30% 감소"
     },
     "item.passive.desc.23": {
-      "en": "+1 [t]MP[/t] every 2 turns, +1 physical damage taken",
+      "en": "+1 [t]MP[/t] every 2 turns, but physical hits deal 1 more damage",
       "ko": "2턴마다 [t]MP[/t] +1, 받는 물리 피해 +1"
     },
     "item.passive.desc.24": {
-      "en": "+10% skill damage, +1 status turn",
+      "en": "Skills deal +10% damage; your statuses last 1 turn longer",
       "ko": "스킬 피해 +10%, 상태 지속 +1턴"
     },
     "item.passive.desc.25": {
-      "en": "Reflects the first status (costs 1 [t]MP[/t])",
-      "ko": "첫 상태 이상을 반사 ([t]MP[/t] 1 소모)"
+      "en": "Reflects the first status cast on you (once per battle, costs 1 [t]MP[/t])",
+      "ko": "첫 상태 이상을 반사 (전투마다 1회, [t]MP[/t] 1 소모)"
     },
     "item.passive.desc.3": {
-      "en": "+35% damage to foes below 35% [t]HP[/t]",
+      "en": "+35% damage to enemies under 35% [t]HP[/t]",
       "ko": "[t]HP[/t] 35% 미만 적에게 피해 +35%"
     },
     "item.passive.desc.4": {
@@ -2689,11 +2689,11 @@
       "ko": "골드를 15% 더 얻음"
     },
     "item.passive.desc.5": {
-      "en": "[t]Good[/t] or [a]Perfect[/a]: may [t]Stun[/t] (3-turn cooldown)",
-      "ko": "[t]좋음[/t] 또는 [a]완벽[/a]: [t]기절[/t]시킬 수 있음 (재사용 3턴)"
+      "en": "A [t]Good[/t] or [a]Perfect[/a] press may [t]Stun[/t] the enemy (3-turn cooldown)",
+      "ko": "[t]좋음[/t] 또는 [a]완벽[/a] 판정 시 적을 [t]기절[/t]시킬 수 있음 (재사용 3턴)"
     },
     "item.passive.desc.6": {
-      "en": "+30% damage to foes with a status",
+      "en": "+30% damage to enemies with a status",
       "ko": "상태 이상에 걸린 적에게 피해 +30%"
     },
     "item.passive.desc.7": {
@@ -2701,11 +2701,11 @@
       "ko": "2턴마다 [t]MP[/t] +1"
     },
     "item.passive.desc.8": {
-      "en": "+15% skill damage, +1 status turn",
+      "en": "Skills deal +15% damage; your statuses last 1 turn longer",
       "ko": "스킬 피해 +15%, 상태 지속 +1턴"
     },
     "item.passive.desc.9": {
-      "en": "+25% skill damage, [a]Perfect[/a] +1 [t]MP[/t]",
+      "en": "Skills deal +25% damage; a [a]Perfect[/a] press gives +1 [t]MP[/t]",
       "ko": "스킬 피해 +25%, [a]완벽[/a] 판정 시 [t]MP[/t] +1"
     },
     "item.passive.name.1": {
@@ -2781,31 +2781,31 @@
       "ko": "비전 쇄도"
     },
     "item.sent.30": {
-      "en": "Throw it for {power} power of damage; it burns for {turns} turns. Costs your turn.",
-      "ko": "위력 {power}의 피해를 주고 {turns}턴 동안 불탑니다. 턴을 소모합니다."
+      "en": "Hits for {power} power and inflicts [t]Burn[/t] for {turns} turns. Costs your turn.",
+      "ko": "위력 {power}의 피해를 주고 {turns}턴 동안 [t]화상[/t]을 입힙니다. 턴을 소모합니다."
     },
     "item.sent.31": {
-      "en": "Throw it to poison the enemy with {n} stacks. Costs your turn.",
+      "en": "Inflicts {n} stacks of [t]Poison[/t]. Costs your turn.",
       "ko": "적에게 [t]독[/t] {n}중첩을 겁니다. 턴을 소모합니다."
     },
     "item.sent.32": {
-      "en": "Throw it for {power} power of damage and a stun that pushes the enemy back. Costs your turn.",
+      "en": "Hits for {power} power and inflicts [t]Stun[/t], pushing the enemy back. Costs your turn.",
       "ko": "위력 {power}의 피해를 주고 [t]기절[/t]시켜 적을 뒤로 밉니다. 턴을 소모합니다."
     },
     "item.sent.33": {
-      "en": "Throw it to dodge the next attack ({turns} turns); a [a]Perfect[/a] throw lets you slip away. Costs your turn.",
+      "en": "Dodge the next attack ({turns} turns). A [a]Perfect[/a] throw lets you slip away. Costs your turn.",
       "ko": "다음 공격을 피합니다({turns}턴). [a]완벽[/a]하게 던지면 도망칩니다. 턴을 소모합니다."
     },
     "item.sent.accessory": {
-      "en": "A ring or charm worn in the accessory slot.",
+      "en": "A ring or charm for the accessory slot.",
       "ko": "장신구 칸에 착용하는 반지나 부적입니다."
     },
     "item.sent.accessory_passive": {
-      "en": "Wear it: {line}.",
+      "en": "While equipped: {line}.",
       "ko": "착용 효과: {line}."
     },
     "item.sent.accessory_stat": {
-      "en": "Wear it for {bonus}.",
+      "en": "Gives {bonus} while equipped.",
       "ko": "착용 효과: {bonus}."
     },
     "item.sent.armor": {
@@ -3629,11 +3629,11 @@
       "ko": "완벽한 공격, 브레이크, 큰 피해, 쓰러질 때 컨트롤러가 짧게 진동합니다."
     },
     "settings.help.scale": {
-      "en": "How many times the picture is enlarged in a window. Only used when windowed. You are asked to keep a change.",
+      "en": "How many times the picture is enlarged. Windowed mode only. You are asked to keep a change.",
       "ko": "창 모드에서 화면을 몇 배로 키울지 정합니다. 창 모드에서만 쓰입니다. 바꾸면 유지할지 물어봅니다."
     },
     "settings.help.shake": {
-      "en": "Turns the screen shake on hits on or off.",
+      "en": "Screen shake when a hit lands: on or off.",
       "ko": "공격을 받을 때 화면이 흔들리는 효과를 켜거나 끕니다."
     },
     "settings.help.text_speed": {
@@ -4098,7 +4098,7 @@
     },
     "stat.perfect": {
       "en": "Perfect rate",
-      "ko": "퍼펙트 비율"
+      "ko": "완벽 비율"
     },
     "stat.time": {
       "en": "Run time",
@@ -4129,11 +4129,11 @@
       "ko": "매 턴 {tick} [t]HP[/t]를 잃고, 중첩이 1 줄어듭니다 ({stacks}중첩, 최대 {max}).{mods}"
     },
     "status.desc.status_blessing": {
-      "en": "Next incoming hit deals {pct}% less damage.",
+      "en": "The next hit you take deals {pct}% less damage.",
       "ko": "다음에 받는 공격의 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_bloodthirsty": {
-      "en": "Until hit: take {take}% less, deal {deal}% more damage.",
+      "en": "Until you are hit: take {take}% less damage, deal {deal}% more.",
       "ko": "맞을 때까지: 받는 피해 {take}% 감소, 주는 피해 {deal}% 증가."
     },
     "status.desc.status_brace": {
@@ -4153,11 +4153,11 @@
       "ko": "다음 공격이 {mult}배의 피해를 줍니다."
     },
     "status.desc.status_evasion": {
-      "en": "Dodges the next incoming attack.",
+      "en": "Dodges the next attack.",
       "ko": "다음에 받는 공격을 피합니다."
     },
     "status.desc.status_guard": {
-      "en": "Blocks the next incoming hit.",
+      "en": "Blocks the next hit.",
       "ko": "다음에 받는 공격을 막습니다."
     },
     "status.desc.status_hit_up": {
@@ -4173,12 +4173,12 @@
       "ko": "다음 공격에서 받는 피해가 {pct}% 줄어듭니다."
     },
     "status.desc.status_stun": {
-      "en": "Pushed back on the turn bar. Then [t]Steadfast[/t]: cannot be stunned for 2 turns.",
+      "en": "Pushed back on the turn strip. Then [t]Steadfast[/t]: cannot be stunned for 2 turns.",
       "ko": "차례가 뒤로 밀립니다. 이후 2턴간 [t]버티기[/t] 상태가 되어 [t]기절[/t]하지 않습니다."
     },
     "status.desc.status_sunder": {
-      "en": "Lose defense.{mods}",
-      "ko": "방어력이 떨어집니다.{mods}"
+      "en": "Lowers [t]DEF[/t].{mods}",
+      "ko": "[t]DEF[/t]가 떨어집니다.{mods}"
     },
     "status.name.default": {
       "en": "Status",
@@ -4725,23 +4725,23 @@
       "ko": "아무 키나 누르세요"
     },
     "tutorial.arrows.body": {
-      "en": "Skills show a row of arrows. Press [k:up][k:down][k:left][k:right] in that order before the time bar runs out. A wrong press costs time.",
-      "ko": "스킬을 쓰면 화살표 줄이 나옵니다. 시간 막대가 다 줄기 전에 [k:up][k:down][k:left][k:right]으로 순서대로 누르세요. 틀리면 시간이 깎입니다."
+      "en": "Match the row of arrows with [k:up][k:down][k:left][k:right], in order, before the time bar empties. A wrong press costs time.",
+      "ko": "시간 막대가 비기 전에 [k:up][k:down][k:left][k:right]으로 화살표 줄을 순서대로 누르세요. 틀리면 시간이 깎입니다."
     },
     "tutorial.arrows.title": {
       "en": "Arrow skills",
       "ko": "화살표 스킬"
     },
     "tutorial.bar.body": {
-      "en": "A cursor slides along the bar. Press [k:confirm] when it is over the bright zone. The closer to the middle, the harder you hit.",
-      "ko": "커서가 막대를 따라 움직입니다. 밝은 구간 위에 왔을 때 [k:confirm]을(를) 누르세요. 가운데에 가까울수록 더 세게 때립니다."
+      "en": "Press [k:confirm] when the cursor is on the bright zone. The closer to the middle, the harder the hit.",
+      "ko": "커서가 밝은 구간에 있을 때 [k:confirm]을(를) 누르세요. 가운데에 가까울수록 더 세게 때립니다."
     },
     "tutorial.bar.title": {
-      "en": "The sliding bar",
-      "ko": "움직이는 막대"
+      "en": "Timing bar",
+      "ko": "타이밍 막대"
     },
     "tutorial.bed.body": {
-      "en": "Each bed can be used once per run. Rest to restore all your [t]HP[/t] and [t]MP[/t], or use it to upgrade one of your skills.",
+      "en": "Each bed works once per run. Rest to restore all your [t]HP[/t] and [t]MP[/t], or upgrade one skill.",
       "ko": "침대는 도전마다 한 번씩만 쓸 수 있습니다. 쉬어서 [t]HP[/t]와 [t]MP[/t]를 모두 채우거나, 스킬 하나를 강화하세요."
     },
     "tutorial.bed.title": {
@@ -4749,7 +4749,7 @@
       "ko": "침대"
     },
     "tutorial.cards.body": {
-      "en": "Level-ups and skill chests offer 3 cards: a new skill, an upgrade or a passive. Take one, or skip for a little gold.",
+      "en": "Level-ups and skill chests offer 3 cards: a skill, an upgrade or a passive. Take one, or skip for a little gold.",
       "ko": "레벨업과 스킬 상자는 카드 3장을 보여 줍니다. 새 스킬, 강화, 패시브 중 하나를 고르거나, 건너뛰고 약간의 골드를 받으세요."
     },
     "tutorial.cards.title": {
@@ -4765,7 +4765,7 @@
       "ko": "막기"
     },
     "tutorial.elite.body": {
-      "en": "Marked enemies are [t]Elites[/t]. They are tougher than normal ones, but their rewards are better.",
+      "en": "Marked enemies are [t]Elites[/t]: tougher than the rest, with better rewards.",
       "ko": "표시가 붙은 적은 [t]정예[/t]입니다. 일반 적보다 강하지만 보상이 더 좋습니다."
     },
     "tutorial.elite.title": {
@@ -4781,7 +4781,7 @@
       "ko": "+{n}개 더"
     },
     "tutorial.shop.body": {
-      "en": "The merchant sells potions and gear. Gold is kept for the whole run, and the stock changes with every run.",
+      "en": "The merchant sells potions and gear. Gold lasts the whole run; the stock changes every run.",
       "ko": "상인은 물약과 장비를 팝니다. 골드는 한 번의 도전 동안 유지되고, 상품은 도전마다 바뀝니다."
     },
     "tutorial.shop.title": {
@@ -4789,23 +4789,23 @@
       "ko": "상점"
     },
     "tutorial.stagger.body": {
-      "en": "[t]Good[/t] hits fill the enemy's [t]stagger[/t] meter. When it is full the enemy goes into [a]BREAK[/a]: it loses a turn and takes +50% damage.",
-      "ko": "좋은 공격은 적의 [t]경직[/t] 게이지를 채웁니다. 가득 차면 적이 [a]브레이크[/a] 상태가 되어 한 턴을 잃고 피해를 50% 더 받습니다."
+      "en": "[t]Good[/t] hits fill the enemy's [t]stagger[/t] meter. When it is full: [a]BREAK[/a]. The enemy loses a turn and takes +50% damage.",
+      "ko": "[t]좋음[/t] 판정 공격은 적의 [t]경직[/t] 게이지를 채웁니다. 가득 차면 [a]브레이크[/a]. 적은 한 턴을 잃고 피해를 50% 더 받습니다."
     },
     "tutorial.stagger.title": {
-      "en": "Stagger and BREAK",
-      "ko": "경직과 브레이크"
+      "en": "Stagger",
+      "ko": "경직"
     },
     "tutorial.status.body": {
-      "en": "[t]Poison[/t], [t]Burn[/t], [t]Bleed[/t] and [t]Stun[/t] last a few turns. The icons under a name show which ones a fighter has.",
-      "ko": "[t]독[/t], [t]화상[/t], [t]출혈[/t], [t]기절[/t]은 몇 턴 동안 이어집니다. 이름 아래 아이콘이 걸려 있는 상태를 보여 줍니다."
+      "en": "Icons under a name show a fighter's statuses, like [t]Poison[/t] or [t]Burn[/t]. They last a few turns.",
+      "ko": "이름 아래 아이콘은 [t]독[/t]이나 [t]화상[/t] 같은 상태 이상을 보여 줍니다. 몇 턴 동안 이어집니다."
     },
     "tutorial.status.title": {
       "en": "Statuses",
       "ko": "상태 이상"
     },
     "tutorial.throwables.body": {
-      "en": "Throwable items hurt an enemy straight from the item menu. Each one is used up when thrown, so save them for hard fights.",
+      "en": "Throw them from the item menu to hurt an enemy. Each is used up, so save them for hard fights.",
       "ko": "투척 도구는 아이템 메뉴에서 바로 적에게 피해를 줍니다. 던지면 사라지니 어려운 싸움을 위해 아껴 두세요."
     },
     "tutorial.throwables.title": {
@@ -4813,8 +4813,8 @@
       "ko": "투척 도구"
     },
     "tutorial.timeline.body": {
-      "en": "The strip at the top shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.",
-      "ko": "위쪽 띠는 다음에 행동할 상대를 보여 줍니다. 빠른 쪽이 더 자주 행동하고, 어떤 스킬은 적을 한 턴 뒤로 밀어냅니다."
+      "en": "The top strip shows who acts next. Faster fighters act more often, and some skills push an enemy back a turn.",
+      "ko": "위쪽 띠가 다음에 행동할 차례를 보여 줍니다. 빠른 쪽이 더 자주 행동하고, 일부 스킬은 적을 한 턴 뒤로 밉니다."
     },
     "tutorial.timeline.title": {
       "en": "Turn order",

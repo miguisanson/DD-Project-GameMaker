@@ -12335,9 +12335,11 @@ function Scenario_StepSmokeCutSkip(_s) {
                 _cs.f0 = _s.f;
                 _cs.amax = 0;
                 _cs.idx2 = _gs.ui.index;
+                _cs.last_hm = 0;
             }
             if (_s.t > 1 && variable_global_exists("skip")) {
                 var _hm = global.skip.st.held_ms;
+                if (_hm > 0) _cs.last_hm = _hm;   // the game's own hold clock (ms): the skip is judged on it, not on frames (a busy PC runs under 60 fps)
                 if (_hm > 0 && _hm < SKIP_HINT_MS - 20 && Skip_HintAlpha(global.skip.st) > 0) _cs.early = true;
                 if (!_cs.mid && _hm >= 1500) {
                     _cs.mid = true;
@@ -12349,7 +12351,8 @@ function Scenario_StepSmokeCutSkip(_s) {
             }
             if (_s.t > 1 && Transition_IsActive() && _gs.transition_fx.type == TRANSITION_TYPE_CUTSCENE && _gs.transition_fx.target_room == rm_floor1) {
                 var _d = _s.f - _cs.f0;
-                Scenario_Check("cutskip_a_2_s_hold_ends_the_intro_not_before_1_9_s", _d >= round(1900 / TRANSITION_FRAME_MS), "frames=" + string(_d));
+                var _lhm = variable_struct_exists(_cs, "last_hm") ? _cs.last_hm : 0;
+                Scenario_Check("cutskip_a_2_s_hold_ends_the_intro_not_before_1_9_s", _lhm >= 1900, "held_ms=" + string(_lhm) + " frames=" + string(_d));
                 Scenario_Check("cutskip_a_2_s_hold_ends_the_intro_within_2_2_s", _d <= round(2200 / TRANSITION_FRAME_MS), "frames=" + string(_d));
                 Scenario_Release();
                 Scenario_Next(_s, 625);
@@ -13626,7 +13629,7 @@ function Scenario_StepSmokeLabels(_s) {
                 var _sm = TabMenu_TopMenu();
                 var _row = _sm.items[_sm.cursor];
                 Scenario_Check("labels_the_cursor_is_on_the_guard_status", _row.id == "status_" + string(STATUS_GUARD), "id=" + string(_row.id));
-                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next incoming hit", string_lower(_row.help)) > 0, "help=" + _row.help);
+                Scenario_Check("labels_the_highlighted_status_says_what_it_does_and_its_turns", string_pos("4 turns left", _row.help) > 0 && string_pos("next hit", string_lower(_row.help)) > 0, "help=" + _row.help);
                 Scenario_Tap("menu_down");
             }
             if (_s.t == 90) {

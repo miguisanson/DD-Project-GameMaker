@@ -579,22 +579,22 @@ function ItemDB_GetPassiveTemplate(_item_id) {
     switch (_item_id) {
         // Weapons
         case 1: return { id: "steady_strike", params: { once_per_turn: true }, desc: ["Steady Strike", "WEAK->OK (1/turn)"] };
-        case 2: return { id: "sunder_edge", params: { first_hit_def_down: 1, turns: 2 }, desc: ["Sunder Edge", "1st hit: -1 DEF for 2 turns"] };
-        case 3: return { id: "executioner", params: { hp_ratio: 0.35, mult: 1.35 }, desc: ["Executioner", "+35% damage vs <35% HP"] };
+        case 2: return { id: "sunder_edge", params: { first_hit_def_down: 1, turns: 2 }, desc: ["Sunder Edge", "Your first hit cuts the enemy's [t]DEF[/t] by 1 for 2 turns"] };
+        case 3: return { id: "executioner", params: { hp_ratio: 0.35, mult: 1.35 }, desc: ["Executioner", "+35% damage to enemies under 35% [t]HP[/t]"] };
         case 4: return { id: "aim_assist", params: { upgrade_good_to_perfect_once_per_turn: true }, desc: ["Aim Assist", "GOOD->PERFECT (1/turn)"] };
-        case 5: return { id: "pinning_shot", params: { stun_chance: 0.15, stun_turns: 1, cooldown_turns: 3, requires_good_or_perfect: true }, desc: ["Pinning Shot", "GOOD+: may Stun (cd 3 turns)"] };
-        case 6: return { id: "predator", params: { mult: 1.30, requires_target_statused: true }, desc: ["Predator", "+30% damage vs statused foes"] };
+        case 5: return { id: "pinning_shot", params: { stun_chance: 0.15, stun_turns: 1, cooldown_turns: 3, requires_good_or_perfect: true }, desc: ["Pinning Shot", "A [t]Good[/t] or [a]Perfect[/a] press may [t]Stun[/t] the enemy (3-turn cooldown)"] };
+        case 6: return { id: "predator", params: { mult: 1.30, requires_target_statused: true }, desc: ["Predator", "+30% damage to enemies with a status"] };
         case 7: return { id: "mana_trickle", params: { mp_gain: 1, every_n_turns: 2 }, desc: ["Mana Trickle", "+1 MP every 2 turns"] };
-        case 8: return { id: "ember_lens", params: { skill_mult: 1.15, status_turn_bonus: 1 }, desc: ["Ember Lens", "+15% skill damage, +1 status turn"] };
-        case 9: return { id: "arcane_surge", params: { skill_mult: 1.25, perfect_mp: 1 }, desc: ["Arcane Surge", "+25% skill damage, PERFECT +1 MP"] };
+        case 8: return { id: "ember_lens", params: { skill_mult: 1.15, status_turn_bonus: 1 }, desc: ["Ember Lens", "Skills deal +15% damage; your statuses last 1 turn longer"] };
+        case 9: return { id: "arcane_surge", params: { skill_mult: 1.25, perfect_mp: 1 }, desc: ["Arcane Surge", "Skills deal +25% damage; a [a]Perfect[/a] press gives +1 [t]MP[/t]"] };
 
         // Armor
-        case 20: return { id: "first_impact", params: { flat_reduction_first_hit: 3, once_per_battle: true }, desc: ["First Impact", "1st hit -3 damage (each battle)"] };
-        case 21: return { id: "brace", params: { guard_mult_next_hit: 0.60, cooldown_turns: 2, triggers_on_take_damage: true }, desc: ["Brace", "After hit: next hit -40% (cd2)"] };
-        case 22: return { id: "debt_plate", params: { big_hit_threshold: 6, big_hit_reduction: 0.30 }, desc: ["Debt Plate", "Big hits reduced by 30%"] };
-        case 23: return { id: "thin_veil", params: { mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }, desc: ["Thin Veil", "+1 MP/2 turns, take +1 phys damage"] };
-        case 24: return { id: "silk_flow", params: { skill_mult: 1.10, status_turn_bonus: 1 }, desc: ["Silk Flow", "+10% skill damage, +1 status turn"] };
-        case 25: return { id: "mirror_stitch", params: { reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }, desc: ["Mirror Stitch", "Reflect 1st status (cost 1 MP)"] };
+        case 20: return { id: "first_impact", params: { flat_reduction_first_hit: 3, once_per_battle: true }, desc: ["First Impact", "The first hit you take deals 3 less damage (once per battle)"] };
+        case 21: return { id: "brace", params: { guard_mult_next_hit: 0.60, cooldown_turns: 2, triggers_on_take_damage: true }, desc: ["Brace", "After you are hit, the next hit deals 40% less (2-turn cooldown)"] };
+        case 22: return { id: "debt_plate", params: { big_hit_threshold: 6, big_hit_reduction: 0.30 }, desc: ["Debt Plate", "Big hits deal 30% less damage"] };
+        case 23: return { id: "thin_veil", params: { mp_gain: 1, every_n_turns: 2, physical_vuln_flat: 1 }, desc: ["Thin Veil", "+1 [t]MP[/t] every 2 turns, but physical hits deal 1 more damage"] };
+        case 24: return { id: "silk_flow", params: { skill_mult: 1.10, status_turn_bonus: 1 }, desc: ["Silk Flow", "Skills deal +10% damage; your statuses last 1 turn longer"] };
+        case 25: return { id: "mirror_stitch", params: { reflect_first_status_once_per_battle: true, mp_cost_on_trigger: 1 }, desc: ["Mirror Stitch", "Reflects the first status cast on you (once per battle, costs 1 [t]MP[/t])"] };
 
         // Accessories (C3, D92): small passives; the stat rings and charms 40-43 carry a plain +1 stat bonus instead.
         case 44: return { id: "hardened", params: { damage_reduction: 0.10 }, desc: ["Hardened", "Take 10% less damage"] };
@@ -832,18 +832,18 @@ function Item_Sentence(_item) {
     if (Item_IsThrowable(_item)) {
         var u = _item.use;
         switch (_item.id) {
-            case 30: return Loc_T("item.sent.30", "Throw it for {power} power of damage; it burns for {turns} turns. Costs your turn.", { power: string(u.power), turns: string(u.burn_turns) });
-            case 31: return Loc_T("item.sent.31", "Throw it to poison the enemy with {n} stacks. Costs your turn.", { n: string(u.stacks) });
-            case 32: return Loc_T("item.sent.32", "Throw it for {power} power of damage and a stun that pushes the enemy back. Costs your turn.", { power: string(u.power) });
-            case 33: return Loc_T("item.sent.33", "Throw it to dodge the next attack ({turns} turns); a Perfect throw lets you slip away. Costs your turn.", { turns: string(u.evade_turns) });
+            case 30: return Loc_T("item.sent.30", "Hits for {power} power and inflicts [t]Burn[/t] for {turns} turns. Costs your turn.", { power: string(u.power), turns: string(u.burn_turns) });
+            case 31: return Loc_T("item.sent.31", "Inflicts {n} stacks of [t]Poison[/t]. Costs your turn.", { n: string(u.stacks) });
+            case 32: return Loc_T("item.sent.32", "Hits for {power} power and inflicts [t]Stun[/t], pushing the enemy back. Costs your turn.", { power: string(u.power) });
+            case 33: return Loc_T("item.sent.33", "Dodge the next attack ({turns} turns). A [a]Perfect[/a] throw lets you slip away. Costs your turn.", { turns: string(u.evade_turns) });
         }
         return Loc_T("item.sent.throw", "Throw it at the enemy. Costs your turn.");
     }
     if (_item.type == ITEM_ACCESSORY) {
         var bonus = Item_BonusText(_item);
-        if (bonus != "") return Loc_T("item.sent.accessory_stat", "Wear it for {bonus}.", { bonus: bonus });
-        if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) return Loc_T("item.sent.accessory_passive", "Wear it: {line}.", { line: string(_item.passive_desc[1]) });
-        return Loc_T("item.sent.accessory", "A ring or charm worn in the accessory slot.");
+        if (bonus != "") return Loc_T("item.sent.accessory_stat", "Gives {bonus} while equipped.", { bonus: bonus });
+        if (variable_struct_exists(_item, "passive_desc") && is_array(_item.passive_desc) && array_length(_item.passive_desc) > 1) return Loc_T("item.sent.accessory_passive", "While equipped: {line}.", { line: string(_item.passive_desc[1]) });
+        return Loc_T("item.sent.accessory", "A ring or charm for the accessory slot.");
     }
     if (_item.type == ITEM_CONSUMABLE && variable_struct_exists(_item, "use")) {
         var us = _item.use;

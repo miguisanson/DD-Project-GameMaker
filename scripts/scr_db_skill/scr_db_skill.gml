@@ -692,7 +692,7 @@ function SkillDB_Init() {
         fx_speed: 0.2,
         hits: 0,
         class_list: [],
-        use_msg: "Your enchantments are snuffed out!"
+        use_msg: "Your buffs are snuffed out!"
     };
 
     global.skill_db[? SKILL_GORE] = {
@@ -1455,7 +1455,7 @@ function CardDB_Init() {
     var K = [CLASS_KNIGHT]; var A = [CLASS_ARCHER]; var M = [CLASS_MAGE]; var N = [CLASS_NOBODY];
     var pas = [
         ["quick_feet",    "Quick Feet",    "Light on your feet: +{n} SPD for good.",                    [], "stat_spd",         { stat_spd: 1 }],
-        ["venom_coat",    "Venom Coat",    "Poison you apply lands {n} extra stack.",                   [], "poison_stacks",    { poison_stacks: 1 }],
+        ["venom_coat",    "Venom Coat",    "[t]Poison[/t] you inflict adds {n} extra stack.",                   [], "poison_stacks",    { poison_stacks: 1 }],
         ["field_medic",   "Field Medic",   "Heal {n} HP after each fight you win.",                     [], "heal_after_fight", { heal_after_fight: 3 }],
         ["steady_hands",  "Steady Hands",  "Perfect zones are {n}% wider.",                             [], "perfect_widen",    { perfect_widen: 0.10 }],
         ["coin_sense",    "Coin Sense",    "Find {n}% more gold.",                                      [], "gold_mult",        { gold_mult: 0.10 }],
@@ -2061,10 +2061,10 @@ function Card_ClassChoices(_prof = undefined) {
 
 function Card_ClassSentence(_class_id) {
     switch (_class_id) {
-        case CLASS_KNIGHT: return Loc_T("class.line.knight", "Guard of the fallen keep. Hits hard, takes hits harder. Stands firm.");
-        case CLASS_ARCHER: return Loc_T("class.line.archer", "A scout of the dark tunnels. Quick and sharp: poison and double shots.");
-        case CLASS_MAGE: return Loc_T("class.line.mage", "A scholar who heard the dark. Frail, but great magic and mana.");
-        case CLASS_NOBODY: return Loc_T("class.line.nobody", "No name, no past, no skills. Only blade, passives and items.");
+        case CLASS_KNIGHT: return Loc_T("class.line.knight", "Guard of a keep that fell. Hits hard, slow to be hurt.");
+        case CLASS_ARCHER: return Loc_T("class.line.archer", "A scout of the dark. Quick, with [t]Poison[/t] and double shots.");
+        case CLASS_MAGE: return Loc_T("class.line.mage", "A scholar the dark read back. Frail; spells hit hard.");
+        case CLASS_NOBODY: return Loc_T("class.line.nobody", "No name, no past, no skills. A blade and your pockets.");
     }
     return "";
 }

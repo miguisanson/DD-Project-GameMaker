@@ -659,12 +659,12 @@ function Help_StatsItems() {
     for (var i = 0; i < 4; i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
     array_push(out, Help_Term("hp", Loc_T("battle.hud.hp", "HP"), Loc_T("help.line.hp", "Health. At 0 HP you fall.")));
     array_push(out, Help_Term("mp", Loc_T("battle.hud.mp", "MP"), Loc_T("help.line.mp", "Magic points. Skills spend them; potions and rest restore them.")));
-    array_push(out, Help_Term("crit", Loc_T("help.term.crit", "Crit"), Loc_T("help.line.crit", "A critical hit deals {mult} times the damage. Take Aim and some gear raise the odds.", { mult: string(COMBAT_CRIT_MULT) })));
+    array_push(out, Help_Term("crit", Loc_T("help.term.crit", "Crit"), Loc_T("help.line.crit", "A critical hit deals {mult} times the damage. [t]Take Aim[/t] and some gear raise the odds.", { mult: string(COMBAT_CRIT_MULT) })));
     array_push(out, Help_Term("perfect", Loc_T("battle.det.perfect", "Perfect"), Loc_T("help.line.perfect", "Press in the bright zone of the bar for +{pct}% damage.", { pct: string(round((Qte_GradeMult(QTE_PERFECT) - 1) * 100)) })));
     array_push(out, Help_Term("good", Loc_T("help.term.good", "Good"), Loc_T("help.line.good", "Press near the middle for +{pct}% damage.", { pct: string(round((Qte_GradeMult(QTE_GOOD) - 1) * 100)) })));
-    array_push(out, Help_Term("ok", Loc_T("help.term.ok", "OK"), Loc_T("help.line.ok", "Press on the bar but off the middle for normal damage.")));
+    array_push(out, Help_Term("ok", Loc_T("help.term.ok", "OK"), Loc_T("help.line.ok", "Press on the bar, off the middle, for normal damage.")));
     array_push(out, Help_Term("weak", Loc_T("help.term.weak", "Weak"), Loc_T("help.line.weak", "Miss the zone and the hit deals {pct}% less damage.", { pct: string(round((1 - Qte_GradeMult(QTE_WEAK)) * 100)) })));
-    array_push(out, Help_Term("break", Loc_T("help.term.break", "BREAK"), Loc_T("help.line.break", "Good hits fill the stagger meter. When it is full the enemy loses a turn and takes +{pct}% damage.", { pct: string(round((BREAK_DAMAGE_MULT - 1) * 100)) })));
+    array_push(out, Help_Term("break", Loc_T("help.term.break", "BREAK"), Loc_T("help.line.break", "Good hits fill the [t]stagger[/t] meter. When it is full the enemy loses a turn and takes +{pct}% damage.", { pct: string(round((BREAK_DAMAGE_MULT - 1) * 100)) })));
     array_push(out, Help_Term("steadfast", Loc_T("battle.chip.steadfast", "Steadfast"), Loc_T("battle.chip.steadfast.line", "Cannot be stunned.")));
     array_push(out, Help_Term("elite", Loc_T("tab.lbl.elite", "Elite"), Loc_T("help.line.elite", "A marked, tougher enemy with a special trait. Its rewards are better.")));
     var sids = Status_AllIds();
@@ -2946,7 +2946,7 @@ function SettingsMenu_Items(_p, _scale_max) {
 
     var r_sh = Settings_Row("shake", Loc_T("settings.row.shake", "Screen shake"), "choice",
         (_p.screen_shake != 0) ? Loc_T("settings.value.on", "On") : Loc_T("settings.value.off", "Off"),
-        Loc_T("settings.help.shake", "Turns the screen shake on hits on or off."));
+        Loc_T("settings.help.shake", "Screen shake when a hit lands: on or off."));
     r_sh.measure = [Loc_T("settings.value.on", "On"), Loc_T("settings.value.off", "Off")];
     array_push(items, r_sh);
 
@@ -2970,7 +2970,7 @@ function SettingsMenu_Items(_p, _scale_max) {
 
     var r_sc = Settings_Row("scale", Loc_T("settings.row.scale", "Scale"), "choice",
         windowed ? (string(_p.display_scale) + "x") : Loc_T("settings.value.auto", "Auto"),
-        Loc_T("settings.help.scale", "How many times the picture is enlarged in a window. Only used when windowed."));
+        Loc_T("settings.help.scale", "How many times the picture is enlarged. Windowed mode only. You are asked to keep a change."));
     r_sc.enabled = windowed;
     r_sc.measure = [string(DISPLAY_SCALE_MAX) + "x", Loc_T("settings.value.auto", "Auto")];
     var wsz = Display_WindowSizeForScale(_p.display_scale);
