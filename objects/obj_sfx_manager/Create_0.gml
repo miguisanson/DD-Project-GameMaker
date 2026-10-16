@@ -12,11 +12,8 @@ global.vol_ui = _settings.audio_ui;
 global.vol_sfx = _settings.audio_sfx;
 global.vol_music = _settings.audio_bgm;
 
-global.bgm_current_sound = noone;
 global.bgm_current_handle = -1;
 global.bgm_current_key = "";
-global.bgm_pending_stop_handle = -1;
-global.bgm_pending_stop_frames = 0;
 global.sfx_last_key = "";
 global.sfx_last_handle = -1;
 global.sfx_active = [];
@@ -35,7 +32,6 @@ global.audio_debug_group_loaded = false;
 global.audio_group_load_requested = false;
 global.audio_debug_missing_count = 0;
 global.audio_debug_total_count = 0;
-global.audio_debug_map_report = [];
 global.mouse_cursor_hidden = false;
 global.skillbook_mana_ambience_handle = -1;
 global.skillbook_mana_ambience_gain = 0;
@@ -43,6 +39,7 @@ global.skillbook_mana_ambience_playing = false;
 global.skillbook_mana_ambience_tail_frames = 0;
 global.skillbook_mana_ambience_last_key = "";
 global.skillbook_mana_ambience_current_key = "";
+SFX_EnsureAudioGlobals();   // ROB-03: marks the audio globals ready so Step never re-creates them
 last_room_id = room;
 
 if (variable_global_exists("sfx_db") && ds_exists(global.sfx_db, ds_type_map)) {

@@ -13,6 +13,7 @@ if (!variable_instance_exists(id, "enemy_uid")) {
 }
 
 enemy_id = -1;     // set in child
+elite_mod = "";    // C3 (D86): "" or one of Elite_Mods(); set by the run's shuffle (Shuffle_ApplyRoom) and kept with the room state
 defeated = false;
 enemy_cfg = undefined;
 

@@ -1,40 +1,37 @@
-main_index = 0;
-main_options = [
-    Loc_T("menu.main.option.0", "New Game"),
-    Loc_T("menu.main.option.1", "Load Game"),
-    Loc_T("menu.main.option.2", "Settings"),
-    Loc_T("menu.main.option.3", "Exit Game")
-];
-main_option_keys = ["menu.main.option.0", "menu.main.option.1", "menu.main.option.2", "menu.main.option.3"];
-difficulty_options = [
-    Loc_T("settings.difficulty.option.0", "Easy"),
-    Loc_T("settings.difficulty.option.1", "Normal"),
-    Loc_T("settings.difficulty.option.2", "Hard")
-];
-difficulty_option_keys = ["settings.difficulty.option.0", "settings.difficulty.option.1", "settings.difficulty.option.2"];
-difficulty_values = [DIFFICULTY_EASY, DIFFICULTY_NORMAL, DIFFICULTY_HARD];
-difficulty_index = 1;
-difficulty_closing = false;
-difficulty_close_frame = UI_OPENED_FRAME_NONE;
-difficulty_pending_action = "";
-difficulty_pending_value = DIFFICULTY_NORMAL;
-
-difficulty_opened_frame = UI_OPENED_FRAME_NONE;
+// Title menu (D0 UI framework, scr_menu.gml Title_*): the stack is built on the first Step in state "main".
+title_stk = undefined;
+title_exit = undefined;      // { at }: New Game was chosen, the run starts when the title menu has faded
+title_refresh = true;        // relabel the title items (language or save files may have changed)
+title_new_slot = -1;         // D175: the save file New Game will use (committed by Title_NewGameGo)
+title_new_wipe = false;      // D175: that file is emptied first (the overwrite picker asked)
+title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };   // D175: where the picker's key line was drawn last (-shots)
+title_btn = { profile: { x: 0, y: 0, w: 0, h: 0 }, codex: { x: 0, y: 0, w: 0, h: 0 } };   // D175: where the title's corner buttons were drawn last (the mouse and -shots read them)
+title_name = undefined;      // D175: the name entry (a struct while it is open)
+title_codex = undefined;     // D175: the Codex screen of the title (a struct while it is open)
+title_credits = undefined;   // release: the Credits page of the title (a struct while it is open)
+title_name_rects = undefined;
+title_cursor_reset = false;  // D175: after another profile, the title cursor starts where a fresh title would put it
+title_t0 = -100000;          // D128: when the picture started to fade in (a fresh launch sets it when the splash appears; every other visit shows it at once)
+title_card = { kind: "none", status: "missing", class_name: "", floor: 0, gold: 0, time_ms: -1 };   // D128: the Continue card's model (Title_Build / Title_Refresh)
+title_card_rect = { x: 0, y: 0, w: 0, h: 0 };     // where the card and the splash prompt were drawn last (the -shots checks read them)
+title_prompt_rect = { x: 0, y: 0, w: 0, h: 0 };
 cutscene_id = "";
 cutscene_started = false;
 cutscene_sequence = [];
 cutscene_segment_index = -1;
 cutscene_segment_hold_timer = 0;
 cutscene_wait_transition = false;
+cutscene_skip = false;   // D48: hold confirm ~1 s skips the cutscene
+credits_t = 0;           // C5 (D105): milliseconds of the credits roll (state "credits"), D108 F2a
 cutscene_transition_next_index = -1;
 cutscene_transition_switched = false;
 boot_logo_phase = 0;
 boot_logo_timer = 0;
 boot_logo_alpha = 0;
-boot_logo_fade_in_frames = 48;
-boot_logo_hold_frames = 120;
-boot_logo_fade_out_frames = 48;
-boot_logo_black_hold_frames = 8;
+boot_logo_fade_in_ms = BOOT_LOGO_FADE_IN_MS;
+boot_logo_hold_ms = BOOT_LOGO_HOLD_MS;
+boot_logo_fade_out_ms = BOOT_LOGO_FADE_OUT_MS;
+boot_logo_black_hold_ms = BOOT_LOGO_BLACK_HOLD_MS;
 boot_logo_sprite = pale_rook_1;
 
 cutscene_definitions = {};
@@ -42,44 +39,42 @@ cutscene_definitions.intro = [
     {
         sprite: black_screen,
         lines: [
-            "This is not a world of fantasy, magic, and dragons.",
+            "This is not a world of magic and dragons.",
             "There were no monsters.",
             "Only monsters among men.",
-            "This is a world of grit-medieval kingdoms and warring countries.",
+            "This is a world of mud, borders and kings.",
             "...",
             "Or is it?",
             "...",
-            "You are a mapmaker in a remote village, scraping by penny to penny.",
-            "There were rumors of conscription for the war between two kingdoms.",
-            "The reward was enough to set you up for a year..",
-            "It was worth it...",
+            "You were a mapmaker in a remote village, scraping by penny to penny.",
+            "Word came that the crown was drafting men for the war.",
+            "The pay would feed you for a year...",
+            "It seemed worth it...",
             "You signed up."
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     },
     {
         sprite: very_first_cut_scene,
         lines: [
-            "The plan was to ambush the enemy using a shortcut.",
-            "Good thing you knew the forest as you grew up here.",
+            "The plan was to ambush the enemy by a shortcut.",
+            "You grew up in these woods. You knew every path.",
             "Then the scouts reported a tunnel near the mountain.",
-            "You'd never heard of such a tunnel in all your life.",
-            "You couldn't help thinking it was a joke...",
+            "You had never heard of a tunnel there. Not once.",
+            "You took it for a joke...",
             "But it wasn't.",
-            "There really was a tunnel. You could hardly believe it.",
-            "The group ventured deep into the tunnel, heading toward the enemy castle...",
-            "You're just the navigator for this raid party.",
-            "And this place never existed before...",
-            "You knew it was a mistake. You could feel it.",
+            "The tunnel was real. None of your maps had room for it.",
+            "The raid party went in, toward the enemy castle...",
+            "You were only the navigator.",
+            "The day before, there was only hillside.",
+            "Your stomach knew it was a mistake.",
             "Before you could speak up.",
-            "You hear cracking...",
-            "Small tremors..."
+            "Stone cracks somewhere overhead...",
+            "Dust sifts onto your shoulders..."
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     },
     {
         sprite: intro_scene,
@@ -87,9 +82,8 @@ cutscene_definitions.intro = [
             "But it was already too late.",
             "You fell."
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     }
 ];
 
@@ -97,26 +91,24 @@ cutscene_definitions.ending = [
     {
         sprite: ending_scene,
         lines: [
-            "Thank the Almighty...",
+            "Air. Actual air...",
             "An exit...",
-            "I need to find out where I am."
+            "First, I need to know where I am."
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     },
     {
         sprite: third_to_last_scene,
         lines: [
             "Huh?",
             "...",
-            "Isn't this the raid party?",
+            "Is that... the raid party?",
             "They're all dead.",
-            "... What on earth..."
+            "...What happened out here?"
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     },
     {
         sprite: second_to_last_scene,
@@ -124,48 +116,34 @@ cutscene_definitions.ending = [
             "...",
             "Oh.",
             "...",
-            "I wasn't so lucky after all."
+            "So much for lucky."
         ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true
+        hold_ms: 0,
+        transition_speed: "normal"
     },
     {
         sprite: last_cut_scene,
         lines: [
             "There is no hope."
         ],
-        hold_frames: 0,
-        transition_speed: "slow",
-        text_only: true,
-        chars_per_sec: 12
+        hold_ms: 0,
+        transition_speed: "slow"
     },
     {
         sprite: black_screen,
-        lines: [
-            "Thank you for playing...",
-            "This was around 2 months of development, and I'm glad you were able to get through our prototype story.",
-            "We're looking to use what we learned from this game for our next title.",
-            "Please support our next development :)",
-            "by PaleRook",
-            "..."
-        ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: false
+        lines: Story_ClosingLines(),   // C5 (D105): the closing text lives in scr_dialogue.gml (the credits roll follows it)
+        hold_ms: 0,
+        transition_speed: "normal"
     }
 ];
 
+// C5 (D103): no more "GAME OVER.". The fade to black is all this holds; the death line and summary follow in RunFlow (scr_room_state).
 cutscene_definitions.game_over = [
     {
-        sprite_name: "GAME_OVER",
-        lines: [
-            "GAME OVER."
-        ],
-        hold_frames: 0,
-        transition_speed: "normal",
-        text_only: true,
-        chars_per_sec: UI_CUTSCENE_GAME_OVER_CHARS_PER_SEC
+        sprite: black_screen,
+        lines: [],
+        hold_ms: Transition_FramesToMs(2),
+        transition_speed: "normal"
     }
 ];
 
@@ -191,7 +169,6 @@ __localize_cutscene("ending");
 __localize_cutscene("game_over");
 
 var gs = GameState_Get();
-load_available = Save_HasAnySlot();
 title_bg_sprite = noone;
 title_bg_layer_id = -1;
 

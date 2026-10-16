@@ -17,7 +17,7 @@ if (Transition_IsActive()) {
 var gs = GameState_Get();
 var dialogue_active = false;
 if (variable_struct_exists(gs, "ui") && is_struct(gs.ui)) {
-    if ((variable_struct_exists(gs.ui, "mode") && gs.ui.mode == UI_DIALOGUE)
+    if ((variable_struct_exists(gs.ui, "mode") && (gs.ui.mode == UI_DIALOGUE || gs.ui.mode == UI_SHOP))   // C3: nothing hunts the player while he shops
     || (variable_struct_exists(gs.ui, "lines") && is_array(gs.ui.lines) && array_length(gs.ui.lines) > 0)) {
         dialogue_active = true;
     }
@@ -28,6 +28,9 @@ if (dialogue_active) {
     move_dir = -1;
     exit;
 }
+// D122: the game pauses behind any screen (pause incl. the focus-loss pause, Tab menu, bed, card screens, a tutorial pop-up): nothing walks, sees, pops a "!" or touches the
+// player until it is gone. A step in progress stays in progress and goes on afterwards. (Cinematic locks are handled at the top.)
+if ((variable_struct_exists(gs, "ui") && is_struct(gs.ui) && variable_struct_exists(gs.ui, "mode") && gs.ui.mode != UI_NONE) || Tutorial_IsOpen()) exit;
 
 var pl = gs.player_inst;
 if (!instance_exists(pl) && instance_exists(obj_player)) {

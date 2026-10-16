@@ -4,7 +4,7 @@
 Background and the proven commands: `.planning/research/automation-igor.md`.
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots] [-NegativeControl]
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.ps1 [-Mode fast|full|compile] [-Only runtests|smoke|bot|shots|gridshots] [-NegativeControl [test|syntax|unknownfn]]
 ```
 
 | Mode | What runs |
@@ -12,6 +12,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\automation\run_tests.p
 | `compile` | Build only (about 15 s). Catches syntax errors, not unknown functions. |
 | `fast` (default) | Build + `-runtests` (timeout 30 s). |
 | `full` | `fast` + `-smoke` (60 s) + `-bot` (120 s) + `-shots` (60 s). |
+
+`-Only exportdata` (not part of `full`) runs `-exportdata`: the game writes `export_data.json` (classes with per-level stats, enemies, skills, items, statuses, level table, loot, constants) and exits; the wrapper checks it parses and every id list is unique, then copies it to `<WorkRoot>\export\` (that folder is never emptied, so the last export stays for the simulator).
 
 `-Only <mode>` runs just that game mode after the build (e.g. `-Mode full -Only smoke`).
 
@@ -25,21 +27,28 @@ Full logs: `E:\Temp\dd-gate\logs\build.log` and `<mode>.log`.
 - Work dirs `src, cache, tmp, out, save, logs` all live under `-WorkRoot` (default `E:\Temp\dd-gate`). If any resolves to C: the script exits 2 before touching anything. `cache` and `tmp` are kept between runs; the rest are emptied.
 - Games run with `LOCALAPPDATA` pointed at `...\save`. A hash of `%LOCALAPPDATA%\DD_Project` is taken before and after; any change is a FAIL. (If the owner plays the real game during a run, that also trips it.)
 - `-runtests` passes only with: a `[TEST-SUMMARY] pass=N fail=0 errors=0` line (N > 0), no `UNHANDLED` / `CRASH` / `[TEST] ERROR` line, `test_results.txt` somewhere under the save dir, exit code 0, no timeout, and no `DD-Project` process left from this run (anything left is killed and counted as FAIL).
-- `-NegativeControl` adds `-testcontrol` to the game, which should add a deliberately failing test. The expected result is `GATE FAIL`; run it whenever this script changes (VER-04).
+- `-NegativeControl` adds `-testcontrol` to the game, which should add a deliberately failing test (and plants a violation for the display source guard). The expected result is `GATE FAIL`; run it whenever this script changes (VER-04).
+- Other plants (R-021), chosen with `-NegativeControl syntax` or `-NegativeControl unknownfn` (same as `-NegativeControl -Plant <kind>`; `-Plant <kind>` alone also implies `-NegativeControl`). Each one edits only the scratch copy under `<WorkRoot>\src` (`scripts\scr_test\scr_test.gml`), never the repo, and each must end in `GATE FAIL`:
+  - `syntax`: appends `function __plant_syntax_error() { var __x = ( ; }`. Igor must fail the build: expect `FAIL build exit code ...` and/or `FAIL build: Error : ...` lines, no game run.
+  - `unknownfn`: adds a suite that calls `__plant_no_such_function_xyz()` to `Test_RunAll`. Igor still compiles with exit 0 (it does not check function names); the `-runtests` run must catch it: expect `[TEST] ERROR PlantUnknownFn ...` and `FAIL runtests: summary reports fail=0 errors=1`.
+  - The `test` plant (the default) is the only one that also plants the display-guard violation.
+- Before the build the wrapper also runs the hardcoded-English lint (`tools/localization/lint_hardcoded_text.py`, step `text-lint`) after its own self-check (`test_lint_hardcoded_text.py`); a finding is a `GATE FAIL`. Pure placeholder strings such as `"{n}"` are not text; `"Lv {n}"` still is.
 
 ## Game modes (in `scripts/scr_debug/scr_debug.gml`, inert without a flag)
 - `-runtests`: assertion suites (`scr_test.gml`).
 - `-smoke`: boots, then rm_start (logo, then the menu) -> rm_floor1 -> rm_battle for a fixed number of frames each. Any runtime error is `[TEST] ERROR UNHANDLED` + `CRASH` (Igor alone does not catch unknown functions).
-- `-bot`: Knight vs Slime. "perfect" variant confirms the menu, times the attack drop and answers the defence arrows from the battle controller's own data and must win; "fail" variant never presses in a QTE and must end (or only the no-error and HP-bounds checks apply). 2000-frame cap for the perfect variant.
+- `-bot`: Knight vs Slime. "perfect" variant confirms the menu, presses the attack bar on its zone and must win; "fail" variant never presses and must end (or only the no-error and HP-bounds checks apply). After each variant: one skill per class (Knight, Archer, Mage) typed through the arrow input and one defended big attack (mini boss Ramming, forced with the debug damage-only switch, which skips the wind-up), asserting grade, multiplier, damage, and that the status is resisted (perfect) or not lengthened (fail). Then every skill animation. Then the status rules (B2, `bot_status_*`): in battle A a Mage against a stunned Slime shows Poison costing 3, 2, 1 and fading, Burning lowering DEF and ending after 2 turns, Bleeding costing nothing on a stunned turn and 4 per action after; in battle B Foresight is cast against a Spider that only uses Poison Fangs and the preview, the "You foresee:" log line, the enemy's real action and the x1.5 Perfect zones (attack bar, defence bar) are checked for 3 turns and back to normal after. Then the turn timeline (B3, `bot_turns_*`): an Archer (SPD 13) against a Slime slowed to 4 acts twice before it and the real turn order equals the timeline model; a Knight's Hilt Bash pushes the Slime back and makes it Steadfast, a second stun is resisted, the real turns are exactly what the strip promised, Perfect attacks fill the stagger meter by the formula until BREAK (pushed back a turn, +50% damage, over when the enemy's turn starts) and no extra player actions exist. Then the battle AI (B4, `bot_ai_*`, still `v=7`, steps 20..33): a Killer Plant at 30% HP heals once, winds up Vine Trap on its 3rd turn (log line, "!" on the strip, no damage) and uses it on the 4th through the defence bar (Perfect); a BREAK during the wind-up cancels the big attack (plain attack instead, bar never comes); a Mad Whisp Snuffs a buffed player; Palehorn crosses 60% and 30% (banner, SPD +2/+4, ATK +3 in the stats and on the timeline, "EE" on the real turn order) and the Pale Choirbeast starting at 20% gets both SPD bonuses with no double action. About 250 s in total (timeout 420 s, frame cap 22000).
 - `-shots`: `screen_save` of rm_start, rm_floor1 and rm_battle at display scales 3, 4, 5 (9 PNGs, copied to `<WorkRoot>\shots`). The wrapper checks file exists, PNG size = reported window size, and not more than 97% one colour. `fit_screen` is not captured.
+- `-gridshots` (D65, only with `-Only gridshots`, not in `full`): visits rm_floor1..9, 6_5 and 9_5 at display scale 4 and saves `shot_grid_<room>.png` with a 16 px grid over the world: green = multiples of 16 from the room origin, violet = from the camera view's corner (only when it is off the room grid), red = the room edges. The PNGs are copied to `<WorkRoot>\gridshots`. Nothing in the rooms changes.
 - Build id: `#macro BUILD_ID "dev"` in the repo; the wrapper stamps `<git short hash>-<yyyyMMdd>[-dirty]` into the scratch copy only. The game prints `[TEST-BUILD] <id>`, the wrapper checks it, and the title screen draws it bottom-right.
 
 ## Focus, fullscreen, and the owner's PC
-- **Do not run the gate while the owner is gaming or typing.** A run opens real game windows for up to a few minutes.
-- Tests never take focus and never use a focus or foreground API. Game windows start minimized and not activated (`SW_SHOWMINNOACTIVE` through a small `CreateProcess` call; falls back to `Start-Process -WindowStyle Minimized` if that fails).
+- **Do not run the gate while the owner is gaming or typing**: it still uses CPU and the GPU for a few minutes. It no longer takes focus (I-053).
+- Game windows are created on their own hidden desktop (`CreateDesktop`, `STARTUPINFO.lpDesktop`), minimized and not activated (`SW_SHOWMINNOACTIVE`). A window on another desktop can never become the owner's foreground window. Falls back to `Start-Process -WindowStyle Minimized` if the launch helper fails to compile.
+- The focus probe is built in: while a game runs, the wrapper polls `GetForegroundWindow` every 10 ms. If the game's process ever owns the foreground it prints `FAIL <mode>: game window took the foreground after N ms (I-053)`. The game itself calls no focus or foreground API.
 - Tests always run windowed: with any test flag the game calls `window_set_fullscreen(false)` at boot (and every frame in smoke, bot and shots), ignoring a saved fullscreen setting.
-- The runner ignores `keyboard_key_press` while its window is not in front, so `-bot` does not use the keyboard. It writes the game's own input state: `Input_Update()` ends with `Scenario_InputOverride()`, a no-op unless `-bot`. The menu, the attack timing and the defence arrows read that state like a real key press.
-- `-shots` has not yet been verified with a minimized window: run it when the owner is not using the PC and check the PNGs are not blank. If `screen_save` is blank when minimized, that needs a decision then.
+- The runner ignores `keyboard_key_press` while its window is not in front, so `-bot` does not use the keyboard. It writes the game's own input state: `Input_Update()` ends with `Scenario_InputOverride()`, a no-op unless a scenario flag is set. The menu, the attack timing and the defence arrows read that state like a real key press.
+- `-shots` works on the hidden desktop (the PNGs are the full picture, not blank).
 
 ## Adding a game mode
 Edit the `$GameModes` table at the top of the script: set `Impl = $true` on the row (flag, timeout and strictness are in the same row).

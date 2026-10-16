@@ -1,0 +1,26 @@
+{
+  "$GMSound":"v2",
+  "%Name":"final_boss_attack_3",
+  "audioGroupId":{
+    "name":"audiogroup_default",
+    "path":"audiogroups/audiogroup_default",
+  },
+  "bitDepth":1,
+  "channelFormat":0,
+  "compression":0,
+  "compressionQuality":4,
+  "conversionMode":0,
+  "duration":1.47,
+  "exportDir":"",
+  "name":"final_boss_attack_3",
+  "parent":{
+    "name":"Final Boss",
+    "path":"folders/Sounds/Entities/Monsters/Final Boss.yy",
+  },
+  "preload":false,
+  "resourceType":"GMSound",
+  "resourceVersion":"2.0",
+  "sampleRate":44100,
+  "soundFile":"final_boss_attack_3.wav",
+  "volume":1.0,
+}

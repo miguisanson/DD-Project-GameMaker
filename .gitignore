@@ -72,3 +72,4 @@ Build
 .claude/gsd-*
 .claude/hooks/
 .claude/scripts/
+__pycache__/
