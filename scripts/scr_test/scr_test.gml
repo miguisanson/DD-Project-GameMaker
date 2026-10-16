@@ -155,6 +155,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Light", Test_Suite_R3Light);
     Test_RunSuite("R3Bvis", Test_Suite_R3Bvis);
     Test_RunSuite("R3Stealth", Test_Suite_R3Stealth);
+    Test_RunSuite("R3StealthB", Test_Suite_R3StealthB);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -10539,16 +10540,17 @@ function Test_H11Search() {
 }
 
 function Test_H11Hear() {
+    // D179: the hearing radius is 2 tiles (it was 4)
     // an enemy at (10,5): the player behind it
-    Test_True("H11 hear: running 4 tiles behind is heard", Hear_RunHeard(10, 5, 6, 5, true));
-    Test_False("H11 hear: walking at the same spot is not heard", Hear_RunHeard(10, 5, 6, 5, false));
-    Test_False("H11 hear: running 5 tiles away is not heard", Hear_RunHeard(10, 5, 5, 5, true));
-    Test_True("H11 hear: any direction (4 tiles in front)", Hear_RunHeard(10, 5, 14, 5, true));
-    Test_True("H11 hear: straight line, not steps: (2,3) is 3.6 tiles", Hear_RunHeard(10, 5, 12, 8, true));
-    Test_False("H11 hear: (3,3) is 4.2 tiles, too far", Hear_RunHeard(10, 5, 13, 8, true));
+    Test_True("H11 hear: running 2 tiles behind is heard", Hear_RunHeard(10, 5, 8, 5, true));
+    Test_False("H11 hear: walking at the same spot is not heard", Hear_RunHeard(10, 5, 8, 5, false));
+    Test_False("H11 hear: running 3 tiles away is not heard", Hear_RunHeard(10, 5, 7, 5, true));
+    Test_True("H11 hear: any direction (2 tiles in front)", Hear_RunHeard(10, 5, 12, 5, true));
+    Test_True("H11 hear: straight line, not steps: (1,1) is 1.4 tiles", Hear_RunHeard(10, 5, 11, 6, true));
+    Test_False("H11 hear: (2,1) is 2.2 tiles, too far", Hear_RunHeard(10, 5, 12, 6, true));
     Test_True("H11 hear: running next to it is heard", Hear_RunHeard(10, 5, 11, 5, true));
 
-    // through the senses: a wall between the two blocks sight but not sound
+    // through the senses: a wall between the two blocks sight, and since D179 sound as well (the radius is 2 tiles and a wall is in the way)
     var _g = Nav_GridFromRows(["..........", "..........", "....#.....", "..........", ".........."]);
     var _prof = EnemyAI_Profile(ENEMY_SLIME);
     var _T = GRID_TILE_SIZE;
@@ -10556,7 +10558,7 @@ function Test_H11Hear() {
     var _ey = 2 * _T;
     var _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 2 * _T, 2 * _T, true, false);
     Test_False("H11 senses: the wall hides the player", _pr.sees);
-    Test_True("H11 senses: running 4 tiles away behind the wall is heard", _pr.heard);
+    Test_False("H11 senses: running 4 tiles away behind the wall is not heard (D179: 2 tiles)", _pr.heard);
     _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 2 * _T, 2 * _T, false, false);
     Test_False("H11 senses: walking at the same place is not heard", _pr.heard);
     _pr = EnemyAI_Perceive(_g, _prof, _ex, _ey, 1 * _T, 2 * _T, true, false);
@@ -15088,4 +15090,228 @@ function Test_R3ConeDraw() {
     }
     Test_Eq("r3stealth draw: every band is 0.06..0.10 calm and a little stronger (at most 0.16) while it chases (bad:" + _bad + ")", _bad, "");
     Test_True("r3stealth draw: the edge (band 0) is softer than the middle (band 2)", Sight_ConeAlpha(0, false) < Sight_ConeAlpha(2, false));
+}
+
+// ============================================================================================================================
+// Round 3 packet stealth, part B: escape and hiding (D179; R-099). Expected values are the brief's:
+//   after losing the player an enemy walks to the last cell it saw him on, searches 3 seconds (180 frames, looking round, never walking along where he was heading), puts up
+//   ONE "?", goes home and cannot notice him for 2 seconds (120 frames) from the moment it gives up; touching it still starts a fight. It hears a RUNNING player within 2 tiles
+//   and only when it has a clear line or a way of at most 2 steps (no hearing through walls). Every chase speed is under the run speed (2 px per frame).
+//   Tall grass is walkable and blocks sight; a player standing still in it for 20 frames is hidden. Every floor from 2 on has at least 2 patches of 2 to 4 cells.
+// ============================================================================================================================
+function Test_Suite_R3StealthB() {
+    Test_RunSuite("R3StealthB.search", Test_R3Search);
+    Test_RunSuite("R3StealthB.hear", Test_R3Hear);
+    Test_RunSuite("R3StealthB.speed", Test_R3ChaseSpeed);
+    Test_RunSuite("R3StealthB.grass", Test_R3Grass);
+    Test_RunSuite("R3StealthB.bushes", Test_R3Bushes);
+}
+
+// 1. The search: about 3 s, in place, one "?" at the end, then home; the ignore after it.
+function Test_R3Search() {
+    if (asset_get_index("EnemyAI_GiveUp") == -1) { Test_True("r3stealth search: EnemyAI_GiveUp exists (not implemented yet)", false); return; }
+    var _g = Nav_GridFromRows(Test_LightOpen(16, 5));
+    var _se = Search_Create(8, 2, 180);
+    var _ticks = 0;
+    var _pops = 0;
+    var _pop_tick = -1;
+    var _walks = 0;
+    var _turns = 0;
+    var _done = false;
+    while (_ticks < 1000 && !_done) {
+        _ticks++;
+        var _r = Search_Step(_se, _g, 8, 2);
+        if (_r.pop) { _pops++; _pop_tick = _ticks; }
+        if (_r.goal_cx >= 0) _walks++;
+        if (variable_struct_exists(_r, "turn") && _r.turn) _turns++;
+        if (_r.done) _done = true;
+    }
+    Test_True("r3stealth search: the search ends", _done);
+    Test_True("r3stealth search: it takes about 3 seconds (150 to 210 frames, took " + string(_ticks) + ")", _ticks >= 150 && _ticks <= 210);
+    Test_Eq("r3stealth search: the ? goes up exactly once", _pops, 1);
+    Test_Eq("r3stealth search: and it goes up as it gives up", _pop_tick, _ticks);
+    Test_Eq("r3stealth search: it never walks on (no goal cell: no leg along where the player was heading)", _walks, 0);
+    Test_True("r3stealth search: it looks round (at least 3 turns)", _turns >= 3);
+    var _after = Search_Step(_se, _g, 8, 2);
+    Test_True("r3stealth search: a finished search stays finished and never pops again", _after.done && !_after.pop);
+    // giving up at once (it cannot reach the cell): done on the next step, still one ?
+    var _s2 = Search_Create(8, 2, 180);
+    Search_Step(_s2, _g, 8, 2);
+    Search_GiveUp(_s2);
+    var _g1 = Search_Step(_s2, _g, 8, 2);
+    Test_True("r3stealth search: giving up ends it on the next step with its one ?", _g1.done && _g1.pop);
+    // the state it leaves: heading home, blind to the player for 2 seconds
+    var _e = { ai_mode: "search", srch: _s2, stuck_frames: 7, spot_cooldown: 0 };
+    EnemyAI_GiveUp(_e);
+    Test_Eq("r3stealth search: it goes home after giving up", _e.ai_mode, "return");
+    Test_Eq("r3stealth search: it cannot notice the player for 2 seconds (120 frames)", _e.spot_cooldown, 120);
+    Test_True("r3stealth search: the search is forgotten", is_undefined(_e.srch));
+}
+
+// 2. Hearing: a RUN, within 2 tiles, needs a clear line or a way of at most 2 steps.
+function Test_R3Hear() {
+    Test_True("r3stealth hear: running 2 tiles away is heard", Hear_RunHeard(10, 5, 12, 5, true));
+    Test_False("r3stealth hear: running 3 tiles away is not heard", Hear_RunHeard(10, 5, 13, 5, true));
+    Test_False("r3stealth hear: walking 2 tiles away is not heard", Hear_RunHeard(10, 5, 12, 5, false));
+    Test_True("r3stealth hear: running on the diagonal next to it is heard", Hear_RunHeard(10, 5, 11, 6, true));
+    Test_False("r3stealth hear: 2 tiles across and 1 down (2.2 tiles) is not heard", Hear_RunHeard(10, 5, 12, 6, true));
+    var _open = Nav_GridFromRows(Test_LightOpen(12, 5));
+    Test_True("r3stealth hear: in the open, 2 tiles, running: heard", Hear_RunHeard(5, 2, 7, 2, true, _open));
+    Test_False("r3stealth hear: in the open, 3 tiles, running: not heard", Hear_RunHeard(5, 2, 8, 2, true, _open));
+    var _wall = Nav_GridFromRows(["............", "............", ".....#......", "............", "............"]);
+    Test_False("r3stealth hear: 2 tiles away with a wall between is not heard (no hearing through walls)", Hear_RunHeard(4, 2, 6, 2, true, _wall));
+    var _barrel = Nav_GridFromRows(["............", "............", ".....o......", "............", "............"]);
+    Test_False("r3stealth hear: nor with a barrel between", Hear_RunHeard(4, 2, 6, 2, true, _barrel));
+    var _grass = Nav_GridFromRows(["............", "............", ".....g......", "............", "............"]);
+    Test_True("r3stealth hear: grass between is no wall: it is 2 steps through it, heard", Hear_RunHeard(4, 2, 6, 2, true, _grass));
+    Test_True("r3stealth hear: next to the wall, a diagonal step away, is heard", Hear_RunHeard(4, 1, 5, 1, true, _wall));
+    // through the senses: behind a wall 2 tiles away, running: no sight, no sound
+    var _T = GRID_TILE_SIZE;
+    var _prof = EnemyAI_Profile(ENEMY_SLIME);
+    var _p = EnemyAI_Perceive(_wall, _prof, 4 * _T, 2 * _T, 6 * _T, 2 * _T, true, false, RIGHT);
+    Test_False("r3stealth hear: through the senses, a runner behind a wall 2 tiles away is neither seen", _p.sees);
+    Test_False("r3stealth hear: nor heard", _p.heard);
+    _p = EnemyAI_Perceive(_open, _prof, 4 * _T, 2 * _T, 2 * _T, 2 * _T, true, false, RIGHT);
+    Test_False("r3stealth hear: a runner 2 tiles behind it is not seen (it faces away)", _p.sees);
+    Test_True("r3stealth hear: but he is heard", _p.heard);
+}
+
+// 3. Running outpaces every enemy (the player walks at 1 px per frame and runs at 2: obj_player run_speed).
+function Test_R3ChaseSpeed() {
+    var _run = 2;
+    var _bad = "";
+    for (var _id = 0; _id <= ENEMY_FINAL_BOSS; _id++) {
+        var _p = EnemyAI_Profile(_id);
+        if (!(_p.chase < _run)) _bad += " " + string(_id) + ":" + string(_p.chase);
+        if (!(_p.ret_speed < _run)) _bad += " ret" + string(_id) + ":" + string(_p.ret_speed);
+    }
+    Test_Eq("r3stealth speed: every enemy's chase and return speed is under the run speed of 2 (bad:" + _bad + ")", _bad, "");
+}
+
+// 4. Tall grass is walkable, blocks sight, and hides a player who stands still in it.
+function Test_R3Grass() {
+    if (asset_get_index("Grid_PropBlocks") == -1) { Test_True("r3stealth grass: Grid_PropBlocks exists (not implemented yet)", false); return; }
+    // (the test room is 10 x 9 cells)
+    var _mv = instance_create_depth(48, 16, 0, obj_barrel);   // something with a mask to move about
+    var _grass = instance_create_depth(96, 16, 0, obj_tall_grass);
+    var _barrel = instance_create_depth(80, 16, 0, obj_barrel);
+    Test_False("r3stealth grass: a step into tall grass is not blocked", Grid_PropBlocks(_mv, 96, 16));
+    Test_True("r3stealth grass: a step into a barrel is", Grid_PropBlocks(_mv, 80, 16));
+    Test_False("r3stealth grass: a step into nothing is not", Grid_PropBlocks(_mv, 112, 16));
+    Test_True("r3stealth grass: standing half on grass and half on the barrel is blocked", Grid_PropBlocks(_mv, 88, 16));
+    Test_False("r3stealth grass: the player's own tile test lets the grass through", Player_TileBlocked(_mv, 96, 16));
+    Test_True("r3stealth grass: and keeps the barrel", Player_TileBlocked(_mv, 80, 16));
+    Test_True("r3stealth grass: an enemy's tile test lets the grass through", Grid_TileFree(_mv, 96, 16));
+    Test_False("r3stealth grass: and keeps the barrel", Grid_TileFree(_mv, 80, 16));
+    var _lg = Nav_BuildGrid();
+    Test_False("r3stealth grass: the room grid lets enemies walk through the grass", Nav_CellBlocked(_lg, 6, 1));
+    Test_True("r3stealth grass: and blocks sight there", Nav_SightBlocked(_lg, 6, 1));
+    Test_True("r3stealth grass: the barrel blocks both", Nav_CellBlocked(_lg, 5, 1) && Nav_SightBlocked(_lg, 5, 1));
+    // hidden: standing still on grass for HIDE_SETTLE_FRAMES (20)
+    var _pl = { x: 96, y: 16, moving: false, still_frames: 20 };
+    Test_True("r3stealth grass: standing still in grass for 20 frames hides the player", Player_IsHidden(_pl));
+    _pl.still_frames = 19;
+    Test_False("r3stealth grass: not before that", Player_IsHidden(_pl));
+    _pl.still_frames = 100;
+    _pl.moving = true;
+    Test_False("r3stealth grass: moving in grass does not hide", Player_IsHidden(_pl));
+    _pl.moving = false;
+    _pl.x = 112;
+    Test_False("r3stealth grass: standing still beside it does not", Player_IsHidden(_pl));
+    _pl.x = 80;
+    Test_False("r3stealth grass: nor on the barrel's cell", Player_IsHidden(_pl));
+    _pl.x = 96;
+    instance_destroy(_grass);
+    Test_False("r3stealth grass: with no grass under him he is not hidden", Player_IsHidden(_pl));
+    instance_destroy(_barrel);
+    instance_destroy(_mv);
+    // placing bushes in code: one instance per cell, never twice on a cell
+    var _made = Bush_Place([[[1, 5], [2, 5]], [[7, 6], [7, 7]]]);
+    Test_Eq("r3stealth grass: Bush_Place makes one grass per cell", _made, 4);
+    Test_Eq("r3stealth grass: there is grass on its cells", (instance_position(1 * 16 + 8, 5 * 16 + 8, obj_tall_grass) != noone && instance_position(7 * 16 + 8, 7 * 16 + 8, obj_tall_grass) != noone) ? 1 : 0, 1);
+    Test_Eq("r3stealth grass: a second call makes none", Bush_Place([[[1, 5], [2, 5]], [[7, 6], [7, 7]]]), 0);
+    with (obj_tall_grass) instance_destroy();
+}
+
+// 5. Where the bushes are: every floor from 2 on has 2 or more patches of 2 to 4 cells, on reachable free floor, off the way between the exits, never on or in front of an exit, a spawn
+// or an enemy's place; the old hiding cells are among them. (The room model is the one the spawn checks use: Test_H11Model.)
+function Test_R3Bushes() {
+    if (asset_get_index("Bush_Patches") == -1) { Test_True("r3stealth bushes: Bush_Patches exists (not implemented yet)", false); return; }
+    var _rooms = Scenario_GridRooms();
+    var _bad = "";
+    var _floors = 0;
+    for (var _ri = 0; _ri < array_length(_rooms); _ri++) {
+        var _name = room_get_name(_rooms[_ri]);
+        var _pp = Bush_Patches(_name);
+        if (_rooms[_ri] == rm_floor1) {
+            Test_Eq("r3stealth bushes: floor 1 has none", array_length(_pp), 0);
+            continue;
+        }
+        _floors++;
+        if (array_length(_pp) < 2) _bad += " " + _name + ":fewer-than-2-patches";
+        var _m = Test_H11Model(_rooms[_ri]);
+        var _g = _m.grid;
+        var _start = _m.spawns[0];
+        var _reach = Test_H11Flood(_g, _start[0], _start[1]);
+        var _path = {};
+        for (var _a = 0; _a < array_length(_m.spawns); _a++) {
+            for (var _b = _a + 1; _b < array_length(_m.spawns); _b++) {
+                var _p = Nav_FindPath(_g, _m.spawns[_a][0], _m.spawns[_a][1], _m.spawns[_b][0], _m.spawns[_b][1]);
+                for (var _c = 0; _c < array_length(_p); _c++) variable_struct_set(_path, string(_p[_c][0]) + "," + string(_p[_c][1]), true);
+            }
+        }
+        var _seen = {};
+        var _total = 0;
+        for (var _pi = 0; _pi < array_length(_pp); _pi++) {
+            var _cells = _pp[_pi];
+            var _n = array_length(_cells);
+            _total += _n;
+            if (_n < 2 || _n > 4) _bad += " " + _name + ":patch" + string(_pi) + "-has-" + string(_n) + "-cells";
+            var _joined = 1;
+            for (var _k = 0; _k < _n; _k++) {
+                var _cx = _cells[_k][0];
+                var _cy = _cells[_k][1];
+                var _key = string(_cx) + "," + string(_cy);
+                var _at = " " + _name + ":(" + _key + ")";
+                if (!Nav_GridInside(_g, _cx, _cy)) { _bad += _at + "outside"; continue; }
+                if (Nav_CellBlocked(_g, _cx, _cy)) _bad += _at + "blocked";
+                if (!_reach[_cy * _g.w + _cx]) _bad += _at + "unreachable";
+                if (variable_struct_exists(_path, _key)) _bad += _at + "on-the-way-between-exits";
+                if (variable_struct_exists(_seen, _key)) _bad += _at + "twice";
+                variable_struct_set(_seen, _key, true);
+                for (var _s = 0; _s < array_length(_m.spawns); _s++) {
+                    if (_m.spawns[_s][0] == _cx && _m.spawns[_s][1] == _cy) _bad += _at + "on-a-spawn";
+                }
+                for (var _x = 0; _x < array_length(_m.exits); _x++) {
+                    if (abs(_m.exits[_x][0] - _cx) + abs(_m.exits[_x][1] - _cy) <= 1) _bad += _at + "at-an-exit";
+                }
+                for (var _e = 0; _e < array_length(_m.slots); _e++) {
+                    if (Nav_CellOf(_m.slots[_e].x + 8) == _cx && Nav_CellOf(_m.slots[_e].y + 8) == _cy) _bad += _at + "on-an-enemy-place";
+                }
+                // joined to another cell of its patch
+                if (_k > 0) {
+                    var _near = false;
+                    for (var _j = 0; _j < _k; _j++) {
+                        if (abs(_cells[_j][0] - _cx) + abs(_cells[_j][1] - _cy) == 1) _near = true;
+                    }
+                    if (!_near && _n > 1) _joined = 0;
+                }
+            }
+            if (!_joined) _bad += " " + _name + ":patch" + string(_pi) + "-is-not-in-one-piece";
+        }
+        if (_total > 12) _bad += " " + _name + ":more-than-12-cells";
+        // Hide_Cells is the flat list of the bush cells
+        var _hc = Hide_Cells(_name);
+        if (array_length(_hc) != _total) _bad += " " + _name + ":Hide_Cells-has-" + string(array_length(_hc)) + "-of-" + string(_total);
+    }
+    Test_True("r3stealth bushes: floors 2 and on were checked (" + string(_floors) + ")", _floors >= 9);
+    Test_Eq("r3stealth bushes: every floor from 2 on has 2 or more patches of 2 to 4 cells in the right places (bad:" + _bad + ")", _bad, "");
+    // the old hiding cells are bushes now
+    var _old = [["rm_floor2", 3, 3], ["rm_floor2", 12, 3], ["rm_floor3", 3, 4], ["rm_floor4", 4, 3], ["rm_floor5", 4, 2], ["rm_floor6", 4, 3], ["rm_floor7", 9, 2]];
+    var _miss = "";
+    for (var _o = 0; _o < array_length(_old); _o++) {
+        if (!Hide_IsCell(_old[_o][0], _old[_o][1], _old[_o][2])) _miss += " " + _old[_o][0] + ":(" + string(_old[_o][1]) + "," + string(_old[_o][2]) + ")";
+    }
+    Test_Eq("r3stealth bushes: the old hiding cells are bush cells (missing:" + _miss + ")", _miss, "");
+    Test_Eq("r3stealth bushes: an unknown room has none", array_length(Bush_Patches("rm_nothing")), 0);
 }
