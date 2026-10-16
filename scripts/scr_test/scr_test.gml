@@ -1838,15 +1838,15 @@ function Test_Suite_Turns() {
     for (var _i = 0; _i < 7; _i++) array_push(_real, Turn_Next(_tl));
     Test_True("Turn_Preview is exactly what the next Turn_Next calls return", Test_SameArray(_a, _real));
 
-    // a fighter with 2x SPD acts about 2x as often (30 turns of 18 vs 9: 20 to 10)
+    // D192: the gauge fills by 10 + SPD, so a fighter with 2x SPD acts about 1.5x as often (rates 28 : 19, 30 turns of 18 vs 9: 28/47 x 30 = 17.9 -> 18 to 12; it was 20 to 10)
     var _two = Turn_New([Turn_Fighter(TL_PLAYER, 18), Turn_Fighter(TL_ENEMY, 9)]);
     var _np = 0;
     for (var _j = 0; _j < 30; _j++) { if (Turn_Next(_two) == TL_PLAYER) _np++; }
-    Test_Eq("2x SPD acts twice as often (20 of 30 turns)", _np, 20);
+    Test_Eq("2x SPD acts about 1.5x as often (18 of 30 turns; was 20)", _np, 18);
     var _three = Turn_New([Turn_Fighter(TL_PLAYER, 9), Turn_Fighter(TL_ENEMY, 27)]);
     var _ne = 0;
     for (var _j2 = 0; _j2 < 40; _j2++) { if (Turn_Next(_three) == TL_ENEMY) _ne++; }
-    Test_Eq("3x SPD acts three times as often (30 of 40 turns)", _ne, 30);
+    Test_Eq("3x SPD acts about 2x as often (rates 37 : 19, 37/56 x 40 = 26.4 -> 27 of 40 turns; was 30)", _ne, 27);
 
     // SPD is read again every turn (Bleeding SPD-2 slows the next turns); a tie goes to the player; SPD never drops below 1
     var _slow = Turn_New([Turn_Fighter(TL_PLAYER, 10), Turn_Fighter(TL_ENEMY, 10)]);

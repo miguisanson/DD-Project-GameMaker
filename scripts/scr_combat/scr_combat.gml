@@ -543,7 +543,9 @@ function Player_OnDeath(_p) {
 // ---- The turn timeline, stun push-back, stagger and BREAK (spec section 11; D19 D74 D75 D79 D92) ----
 // Pure: the numbers live in these functions so check_combat_vectors.py can pin them down. The battle owns one timeline (bc.tl) with two fighters,
 // TL_PLAYER (listed first, so it wins ties) and TL_ENEMY.
-#macro TURN_GAUGE_MAX 100          // a fighter acts when its gauge reaches this; one tick adds its SPD
+#macro TURN_GAUGE_MAX 100          // a fighter acts when its gauge reaches this; one tick adds TURN_SPD_BASE + its SPD (D192)
+#macro TURN_SPD_BASE 10            // D192: the gauge fills by 10 + SPD a tick (it was SPD): speed counts for less
+#macro TURN_MAX_IN_ROW 2           // D192: nobody takes a third turn in a row; the third goes to the other side
 #macro TURN_STEADFAST_TURNS 2      // after a stun the fighter is stun-immune for this many of its own turns
 #macro TURN_PREVIEW_COUNT 5        // the strip shows the next 5 turns (D74)
 #macro TURN_BOSS_PUSH 0.5          // a boss as the target of a stun is pushed back half as far (D75)
@@ -558,7 +560,7 @@ function Turn_Fighter(_id, _spd, _boss = false) {
 }
 
 function Turn_New(_fighters) {
-    return { fighters: _fighters };
+    return { fighters: _fighters, last: -1, streak: 0 };   // last / streak: who acted last and how many turns in a row (D192)
 }
 
 function Turn_Find(_tl, _id) {
@@ -574,7 +576,7 @@ function Turn_Copy(_tl) {
         var f = _tl.fighters[i];
         array_push(out, { id: f.id, spd: f.spd, gauge: f.gauge, steadfast: f.steadfast, boss: f.boss });
     }
-    return { fighters: out };
+    return { fighters: out, last: variable_struct_exists(_tl, "last") ? _tl.last : -1, streak: variable_struct_exists(_tl, "streak") ? _tl.streak : 0 };
 }
 
 function Turn_SetSpd(_tl, _id, _spd) {
@@ -582,28 +584,35 @@ function Turn_SetSpd(_tl, _id, _spd) {
     if (is_struct(f)) f.spd = max(1, round(_spd));
 }
 
-// Who acts next. Nobody ready: tick (every gauge += SPD) until somebody is. The highest gauge acts, a tie goes to the first in the list (the player).
+// Who acts next. Nobody ready: tick (every gauge += TURN_SPD_BASE + SPD, D192) until somebody is. The highest gauge acts, a tie goes to the first in the list (the player).
+// D192: a fighter that has just acted TURN_MAX_IN_ROW times in a row is skipped: the others tick until one is ready (the skipped one keeps filling).
 // The actor pays TURN_GAUGE_MAX (the overflow is kept) and its Steadfast counts down by one.
 function Turn_Next(_tl) {
     var fs = _tl.fighters;
     var n = array_length(fs);
+    var last = variable_struct_exists(_tl, "last") ? _tl.last : -1;
+    var streak = variable_struct_exists(_tl, "streak") ? _tl.streak : 0;
+    var blocked = (streak >= TURN_MAX_IN_ROW) ? last : -999;
     var ready = false;
-    for (var i = 0; i < n; i++) { if (fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
+    for (var i = 0; i < n; i++) { if (fs[i].id != blocked && fs[i].gauge >= TURN_GAUGE_MAX) ready = true; }
     if (!ready) {
         var ticks = 1000000;
         for (var j = 0; j < n; j++) {
-            var need = max(1, (TURN_GAUGE_MAX - fs[j].gauge + fs[j].spd - 1) div fs[j].spd);
+            if (fs[j].id == blocked) continue;
+            var rate = TURN_SPD_BASE + fs[j].spd;
+            var need = max(1, (TURN_GAUGE_MAX - fs[j].gauge + rate - 1) div rate);
             ticks = min(ticks, need);
         }
-        for (var k = 0; k < n; k++) fs[k].gauge += fs[k].spd * ticks;
+        for (var k = 0; k < n; k++) fs[k].gauge += (TURN_SPD_BASE + fs[k].spd) * ticks;
     }
     var best = -1;
     for (var m = 0; m < n; m++) {
-        if (fs[m].gauge >= TURN_GAUGE_MAX && (best < 0 || fs[m].gauge > fs[best].gauge)) best = m;
+        if (fs[m].id != blocked && fs[m].gauge >= TURN_GAUGE_MAX && (best < 0 || fs[m].gauge > fs[best].gauge)) best = m;
     }
     var actor = fs[best];
     actor.gauge -= TURN_GAUGE_MAX;
     actor.steadfast = max(0, actor.steadfast - 1);
+    if (actor.id == last) { _tl.streak = streak + 1; } else { _tl.last = actor.id; _tl.streak = 1; }
     return actor.id;
 }
 

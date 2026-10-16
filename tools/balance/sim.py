@@ -60,6 +60,8 @@ WP_RESIST_MULT = 0.5  # a resisting enemy: the chance times this, rounded down t
 # D180: the Guard command gives back max(GUARD_MP_MIN, floor(GUARD_MP_PCT x max MP)) MP, never above max MP (GUARD_MP_PCT / GUARD_MP_MIN in scr_macros; the export has no field for them)
 GUARD_MP_PCT = 0.25
 GUARD_MP_MIN = 2
+TURN_SPD_BASE = 10     # D192: the turn gauge fills by 10 + SPD a tick
+TURN_MAX_IN_ROW = 2    # D192: nobody gets a third turn in a row
 BEDS_HEAL_FRAC = 1.0   # C4 (D47): a bed heals all HP and MP (scr_levelup Bed_Heal on branch c4-rest)
 # H4 (D143): the level's free point may go to Max HP (+FREE_POINT_HP_GAIN) or Max MP (+FREE_POINT_MP_GAIN) instead of the class stat (scr_macros). what-if knobs:
 # constants.free_point_choices=0 plays the old way (always the class stat), constants.free_point_hp_gain / free_point_mp_gain change the amounts.
@@ -655,6 +657,8 @@ class Battle:
         self.ctx = ctx
         self.probs = PROFILES[profile] if isinstance(profile, str) else profile
         self.gauge = [0, 0]      # player, enemy
+        self.tl_last = -1        # D192: who acted last and how many turns in a row
+        self.tl_streak = 0
         self.steadfast = [0, 0]
         self.p_turns = 0
         self.e_actions = 0
@@ -698,17 +702,24 @@ class Battle:
     # ---- timeline (spec section 11) ----
     def tl_next(self):
         R = self.R
-        spd = [max(1, R.eff(self.p, "spd")), max(1, R.eff(self.e, "spd"))]
+        rate = [TURN_SPD_BASE + max(1, R.eff(self.p, "spd")), TURN_SPD_BASE + max(1, R.eff(self.e, "spd"))]   # D192: the gauge fills by 10 + SPD
         g = self.gauge
         gm = R.d.tl["gauge_max"]
-        if g[0] < gm and g[1] < gm:
-            ticks = min(max(1, -(-(gm - g[0]) // spd[0])), max(1, -(-(gm - g[1]) // spd[1])))
-            g[0] += spd[0] * ticks
-            g[1] += spd[1] * ticks
-        who = 0
-        if g[1] >= gm and (g[0] < gm or g[1] > g[0]):
-            who = 1
+        blocked = self.tl_last if self.tl_streak >= TURN_MAX_IN_ROW else -1   # D192: nobody acts three times in a row
+        cand = [i for i in (0, 1) if i != blocked]
+        if not any(g[i] >= gm for i in cand):
+            ticks = min(max(1, -(-(gm - g[i]) // rate[i])) for i in cand)
+            g[0] += rate[0] * ticks
+            g[1] += rate[1] * ticks
+        who = cand[0]
+        for i in cand[1:]:
+            if g[i] >= gm and (g[who] < gm or g[i] > g[who]):
+                who = i
         g[who] -= gm
+        if self.tl_last == who:
+            self.tl_streak += 1
+        else:
+            self.tl_last, self.tl_streak = who, 1
         self.steadfast[who] = max(0, self.steadfast[who] - 1)
         return who
 
@@ -1500,7 +1511,7 @@ class Policy:
         out.append(("basic", -1, basic, 0, basic))
         e_dpa = self.enemy_dpa(b)
         my_spd, e_spd = R.eff(p, "spd"), R.eff(e, "spd")
-        e_per_p = e_spd / max(1, my_spd)
+        e_per_p = (TURN_SPD_BASE + e_spd) / (TURN_SPD_BASE + max(1, my_spd))   # D192: gauge rate = 10 + SPD
         exch = basic / max(0.5, e_dpa * e_per_p)       # enemy HP removed per player HP lost
         remaining = max(1.0, e.hp / max(0.5, basic))   # player turns the fight still needs on basic attacks
         self.last_ctx = dict(basic=basic, e_dpa=e_dpa, e_per_p=e_per_p, exch=exch, remaining=remaining)
@@ -1610,7 +1621,7 @@ class Policy:
         max_hit = self.enemy_max_hit(b)
         if st_has(p, GUARD) or st_has(p, EVASION):
             max_hit = self.enemy_dpa(b)
-        e_acts = max(1.0, R.eff(e, "spd") / max(1, R.eff(p, "spd")))
+        e_acts = max(1.0, (TURN_SPD_BASE + R.eff(e, "spd")) / (TURN_SPD_BASE + max(1, R.eff(p, "spd"))))
         danger = max_hit * (1.0 if e_acts < 1.5 else min(2.0, e_acts)) + self.dot_pending(p)
         # 1. heal
         if (hp <= danger * 1.15 or hp < 0.30 * p.mhp):
@@ -2865,11 +2876,11 @@ def fast_timeline_script(spd_p, spd_e, boss, script):
     b = Battle(R, p, e, "average", random.Random(1), Policy(R), None)
 
     def prev(n):
-        saved = (list(b.gauge), list(b.steadfast))
+        saved = (list(b.gauge), list(b.steadfast), b.tl_last, b.tl_streak)
         s = ""
         for _ in range(n):
             s += "PE"[b.tl_next()]
-        b.gauge, b.steadfast = saved
+        b.gauge, b.steadfast, b.tl_last, b.tl_streak = saved
         return "(" + s + ")"
 
     out = ""
