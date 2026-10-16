@@ -14913,7 +14913,7 @@ function Test_R3Layout() {
     TextFit_End(_s);
 }
 
-// 4. The last-turn blink is an outline round the chip's icon cell and a label that toggles lightest / light, never a filled box; it follows the turns left.
+// 4. The last-turn blink is an outline round the chip's icon cell and a label that toggles white / light green (I-108), never a filled box; it follows the turns left.
 function Test_R3Blink() {
     var _on = Battle_ChipBlink(true, true, 0);
     var _off = Battle_ChipBlink(true, true, 250);
@@ -14922,11 +14922,11 @@ function Test_R3Blink() {
     Test_True("r3bvis blink: on the dark beat (250 ms later) the outline is off", !_off.outline);
     Test_True("r3bvis blink: and it is on again 500 ms in", _on2.outline);
     Test_True("r3bvis blink: never a filled box, on either beat", !_on.box && !_off.box && !_on2.box);
-    Test_True("r3bvis blink: the label is lightest on the lit beat and light on the dark beat", _on.label_col == UI_C_LIGHTEST && _off.label_col == UI_C_LIGHT && _on2.label_col == UI_C_LIGHTEST);
+    Test_True("r3bvis blink: the label is white on the lit beat and light green on the dark beat", _on.label_col == UI_C_TEXT && _off.label_col == UI_C_LIGHT && _on2.label_col == UI_C_TEXT);
     var _calm = Battle_ChipBlink(false, true, 0);
     var _calm2 = Battle_ChipBlink(false, false, 0);
     Test_True("r3bvis blink: a chip with turns left does not blink: no outline, no box", !_calm.outline && !_calm.box && !_calm2.outline && !_calm2.box);
-    Test_True("r3bvis blink: its label keeps its own colour (white-green for a debuff, mid green for a buff)", _calm.label_col == UI_C_LIGHTEST && _calm2.label_col == UI_C_LIGHT);
+    Test_True("r3bvis blink: its label is plain white, a debuff or a buff (I-108)", _calm.label_col == UI_C_TEXT && _calm2.label_col == UI_C_TEXT);
 
     // R-094: a bleed blinks on its last TURN, not because its stack count is 1
     var _ch = CharacterCreate_Player(CLASS_KNIGHT);
@@ -16113,17 +16113,17 @@ function Test_R3FixDetLists() {
                     // what the panel kept: the sentence, and the lines in priority order (level 0 all, 1 the kept ones, 2 the last resort)
                     var _full = Test_R3FixDetLabels(_it.lines);
                     var _shown = json_stringify(Test_R3FixDetLabels(_g.lines_shown));
-                    var _want = (_g.lines_level == 0) ? json_stringify(_full) : json_stringify(Test_R3FixDetKeeps(_it.lines, _k == 0, _g.lines_level >= 2));
+                    var _want = (_g.lines_level == 0) ? json_stringify(_full) : ((_g.lines_level >= 3) ? json_stringify([]) : json_stringify(Test_R3FixDetKeeps(_it.lines, _k == 0, _g.lines_level >= 2)));   // I-107: level 3 keeps no number line
                     if (_g.det_rect.w <= 0 || _shown != _want) _f.keep += _tag + "level " + string(_g.lines_level) + " shown=" + _shown + " want=" + _want + "; ";
                     var _normal_rows = min(3, array_length(_m.items));
                     var _reduced = (_g.rows_vis < _normal_rows);
                     var _seq = (variable_struct_exists(_it, "seq") && array_length(_it.seq) > 0);
                     if (_reduced && (_g.lines_level < 1 || (_seq && !_g.seq_drop))) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " level " + string(_g.lines_level) + "; ";
-                    if (_g.gap < _mt.margin && _g.rows_vis != 1) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
-                    if (_g.hint_hidden && (_g.rows_vis != 1 || _g.lines_level < 1)) _f.order += _tag + "hint left out with " + string(_g.rows_vis) + " rows, level " + string(_g.lines_level) + "; ";
-                    if (_g.lines_level >= 2 && !(_g.hint_hidden && _g.rows_vis == 1)) _f.order += _tag + "last-resort lines before the hint and the rows gave way; ";
+                    if (_g.gap < _mt.margin && _g.rows_vis != 1 && !_g.det_tight) _f.rows += _tag + "gap shrunk with " + string(_g.rows_vis) + " rows; ";
+                    if (_g.hint_hidden && (_g.rows_vis > 2 || _g.lines_level < 1)) _f.order += _tag + "hint left out with " + string(_g.rows_vis) + " rows, level " + string(_g.lines_level) + "; ";
+                    if (_g.lines_level >= 2 && !(_g.hint_hidden && _g.rows_vis <= 2)) _f.order += _tag + "last-resort lines before the hint and the rows gave way; ";
                     if (_g.lines_level >= 1 && _seq && !_g.seq_drop && _g.rows_vis < _normal_rows) _f.order += _tag + "arrows kept while rows go; ";
-                    if ((_g.det_step > 0 || _g.det_tight) && !(_g.hint_hidden && _g.rows_vis == 1 && _g.lines_level >= 2)) _f.order += _tag + "smaller type before the rest gave way; ";
+                    if ((_g.det_step > 0 || _g.det_tight) && !(_g.hint_hidden && _g.rows_vis <= 2 && _g.lines_level >= 2)) _f.order += _tag + "smaller type before the rest gave way; ";
                     if (_g.hint_hidden) _hid++;
                     if (_g.det_step > 0) _stp++;
                     if (_g.lines_level >= 2) _l2++;
@@ -16142,7 +16142,7 @@ function Test_R3FixDetLists() {
     Test_Eq("r3fixdet lists: the hint stays with the details panel", _f.hint, "");
     Test_Eq("r3fixdet lists: the details panel keeps its sentence and its lines in priority order: Damage / Perfect / MP stay while anything else goes first (only the last resort drops the MP the row also shows)", _f.keep, "");
     Test_Eq("r3fixdet lists: the list shows fewer rows only after the details dropped what they could", _f.rows, "");
-    Test_Eq("r3fixdet lists: the order of giving way is lines, arrows, rows, then the hint, then the last-resort lines, then the smaller type", _f.order, "");
+    Test_Eq("r3fixdet lists: the order of giving way is lines, arrows, rows (down to two), then the hint, then the last-resort lines, then the smaller type (I-107: one row only after all of that)", _f.order, "");
     Test_True("r3fixdet lists: (info) the hint is left out in " + string(_hid) + " of " + string(_n) + " layouts, the last-resort lines in " + string(_l2) + ", the smaller type in " + string(_stp), true);
     TextFit_End(_s);
 }
@@ -19088,6 +19088,7 @@ function Test_R4Final1Lists() {
     var _n = 0;
     var _multi = 0;
     var _scrolls = 0;
+    var _nolim = 0;
     for (var _l = 0; _l < 2; _l++) {
         for (var _z = 0; _z < array_length(_sizes); _z++) {
             TextFit_Set(_sizes[_z][0], _sizes[_z][1], _langs[_l]);
@@ -19124,7 +19125,16 @@ function Test_R4Final1Lists() {
                                 var _tag = _langs[_l] + " " + string(_sizes[_z][0]) + " " + ((_k == 0) ? "skill" : "item") + " class " + string(_classes[_c]) + " full=" + string(_v) + " enemy " + string(_enemies[_e]) + " cur " + string(_seq[_q]) + "/" + string(_cnt) + "; ";
                                 _n++;
                                 if (_cnt >= 2) _multi++;
-                                if (_cnt >= 2 && _g.rows_vis < 2) _f.rows += _tag + "rows=" + string(_g.rows_vis) + "; ";
+                                if (_cnt >= 2) {
+                                    // two rows are owed unless even the most squeezed details panel (the sentence alone, one type step smaller, tight, no hint, the panels sharing a border) leaves no room for two
+                                    // rows under the enemy: that is a physical limit of a long sentence at a big text size (800 x 720), where one whole row is all that fits
+                                    var _ci = clamp(_m.cursor, 0, _cnt - 1);
+                                    var _sq = Ui_DetailsHeight(_g.panel_w, _m.items[_ci].help, [], 2, 0, undefined, 1, true);
+                                    var _room = _m.layout.y_bottom - _m.layout.det_floor_alt;
+                                    var _can2 = (Ui_AboveNeed(_sq, -2 * _mt.p, _g.chrome_y, 2, _g.rhs, _mt, _ci) <= _room);
+                                    if (_can2 && _g.rows_vis < 2) _f.rows += _tag + "rows=" + string(_g.rows_vis) + " although two fit; ";
+                                    if (!_can2) { _nolim++; if (_sizes[_z][0] < 800) _f.rows += _tag + "two rows do not fit below 800 wide; "; }
+                                }
                                 var _hr = Battle_ListHintRect(_g.det_rect, _state, _g.hint_hidden);
                                 if (_hr.w > 0 && (_hr.x < 0 || _hr.x + _hr.w > _gw || _hr.y < 0)) _f.hint += _tag + json_stringify(_hr) + "; ";
                                 if (!variable_struct_exists(_g, "cue_on") || !_g.cue_on || !variable_struct_exists(_m.layout, "scroll_cue") || !_m.layout.scroll_cue) {
@@ -19157,7 +19167,8 @@ function Test_R4Final1Lists() {
     }
     _gs.player_ch = _old;
     Test_True("r4final1 lists: (setup) many cursor positions were looked at (" + string(_n) + ", " + string(_multi) + " with 2+ entries)", _n >= 300 && _multi >= 300);
-    Test_Eq("r4final1 lists: a list with 2+ entries always shows at least 2 rows (480, 640, 800; en, ko; every class, level 1 kit and full kit; boss and slime)", _f.rows, "");
+    Test_Eq("r4final1 lists: a list with 2+ entries shows at least 2 rows (480, 640, 800; en, ko; every class, level 1 kit and full kit; boss and slime), except where two rows cannot fit even with the details squeezed (only 800 wide)", _f.rows, "");
+    Test_True("r4final1 lists: (info) " + string(_nolim) + " of " + string(_multi) + " positions have no room for two rows even with the details squeezed (800 x 720, a sentence of 4+ lines)", true);
     Test_Eq("r4final1 lists: the list has a scroll cue (a counter and arrows)", _f.cue, "");
     Test_True("r4final1 lists: (setup) some lists really scroll (" + string(_scrolls) + " positions with hidden rows)", _scrolls >= 100);
     Test_Eq("r4final1 lists: the counter reads current/total", _f.count, "");

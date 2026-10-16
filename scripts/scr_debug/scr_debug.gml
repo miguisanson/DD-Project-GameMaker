@@ -3092,7 +3092,10 @@ function Scenario_StepShots(_s) {
             Scenario_StepShotsR3Mouse(_s);   // mouse (D182, R-111): the cursor over the title, pressed, over a battle menu and over a Settings slider, three sizes; goes on with ideas2 (1120)
             break;
         case 1120: case 1121: case 1122: case 1123: case 1124: case 1125: case 1126: case 1127: case 1128: case 1129:
-            Scenario_StepShotsR3Ideas2(_s);   // ideas2 (D173, D185): the trapped line and the bar on the map, the boss's zoom punch; three sizes; the end of the pictures
+            Scenario_StepShotsR3Ideas2(_s);   // ideas2 (D173, D185): the trapped line and the bar on the map, the boss's zoom punch; three sizes; goes on with r4final1 (1130), the end of the pictures
+            break;
+        case 1130: case 1131: case 1132: case 1133: case 1134: case 1135: case 1136: case 1137: case 1138: case 1139:
+            Scenario_StepShotsR4Final1(_s);   // r4final1 (I-107, I-108): the battle Skill list with its counter, arrows and two rows (Archer level 1, a full Mage list, Korean) and white chip labels; three sizes; the end of the pictures
             break;
         case 185: case 186: case 187: case 188: case 189:
             Scenario_StepShotsBattleUi(_s);   // D1a: the battle HUD (idle, lists with details, wind-up, BREAK) and the dialogue box (name tab, choices), two sizes, Korean once
@@ -18610,9 +18613,116 @@ function Scenario_StepShotsR3Ideas2(_s) {
                 if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
                 if (_o.di >= array_length(_scenes)) {
                     Scenario_SetWindowScale(3);
-                    Scenario_MouseEnd();   // the end of the pictures: the fake mouse and the files the scenes made go
+                    Scenario_Next(_s, 1130);   // goes on with the r4final1 pictures (1130..1133), the end of the pictures
                 } else {
                     Scenario_Next(_s, 1120);
+                }
+            }
+            break;
+    }
+}
+
+
+// ============================================================================
+// Round 4 final fixes, packet final1 (I-107, R-121; I-108, R-122) pictures 1130..1133, shot_r4final1_<scene>_<w>x<h>.png at scales 3, 4, 5. The end of the pictures: the last step calls Scenario_MouseEnd.
+//   archer  Archer level 1 in a fight with the Dire Wolf, the Skill list open (one skill: the counter reads 1/1)
+//   mage    a Mage with every Mage skill against the final boss, the Skill list open on the third row (up and down arrows, 3/n, two or more rows)
+//   chips   a Dire Wolf with statuses (a buff and debuffs, one on its last turn) and the player's statuses: every label is white
+//   mage_ko the Mage list in Korean against the spider
+// ============================================================================
+function Scenario_R4Final1Scenes() {
+    return ["archer", "mage", "chips", "mage_ko"];
+}
+
+function Scenario_R4Final1Enemy(_di) {
+    if (_di == 0 || _di == 2) return ENEMY_DIREWOLF;
+    if (_di == 1) return ENEMY_FINAL_BOSS;
+    return ENEMY_SPIDER;
+}
+
+function Scenario_StepShotsR4Final1(_s) {
+    if (!variable_struct_exists(_s, "r4f")) _s.r4f = { di: 0, si: 0 };
+    var _o = _s.r4f;
+    var _scenes = Scenario_R4Final1Scenes();
+    var _scales = [3, 4, 5];
+    switch (_s.step) {
+        case 1130:   // scene _o.di at scale _o.si: enter the battle
+            if (_s.t == 1) {
+                Mouse_FakeClear();
+                Dialogue_CloseNow();
+                Scenario_ClearUi();
+                Loc_SetLanguage("en");
+                Scenario_NewKnight((_o.di == 0) ? CLASS_ARCHER : CLASS_MAGE);
+                Scenario_SetWindowScale(_scales[_o.si]);
+                Scenario_GotoBattle("shots_r4final1_" + string(_o.di) + "_" + string(_o.si), Scenario_R4Final1Enemy(_o.di));
+            }
+            if (_s.t >= 25) Scenario_Next(_s, 1131);
+            break;
+        case 1131:   // set the scene up
+            if (_o.di == 3) Loc_SetLanguage("ko");   // after the room has loaded: a room controller reloads the language from the settings
+            var _inb = (room == rm_battle && instance_exists(obj_battle_controller));
+            Scenario_Check("shots_r4final1_in_battle_" + _scenes[_o.di], _inb, "room=" + room_get_name(room));
+            if (!_inb) { Scenario_MouseEnd(); return; }
+            var _bc = instance_find(obj_battle_controller, 0);
+            _bc.wait_timer = COMBAT_HOLD_FOREVER_MS;
+            _bc.pops = [];
+            _bc.combat_log = [];
+            _bc.tl_who = TL_PLAYER;
+            _bc.turn = TURN_PLAYER;
+            _bc.enemy_action_pending = false;
+            _bc.battle_state = BSTATE_MENU;
+            if (_o.di == 0) _bc.p.skills = [SKILL_DOUBLE_SHOT];   // the owner's Archer at level 1: one skill
+            if (_o.di == 1 || _o.di == 3) _bc.p.skills = Skill_IdsOfClass(CLASS_MAGE);
+            if (_o.di == 2) {   // a buff and debuffs on the wolf (one on its last turn), a buff and a debuff on the player
+                _bc.e = Status_Add(_bc.e, STATUS_BLOODTHIRSTY, 4, 0);
+                _bc.e = Status_Add(_bc.e, STATUS_BLEED, 1, 0, 2);
+                _bc.e = Status_Add(_bc.e, STATUS_BURN, 3, 3);
+                _bc.p = Status_Add(_bc.p, STATUS_BRACE, 2, 0);
+                _bc.p = Status_Add(_bc.p, STATUS_POISON, 0, 0, 2);
+            }
+            _bc.p.mp = _bc.p.max_mp;
+            _bc.ui_cmd = undefined;   // the menus are built again from the character
+            Scenario_Next(_s, 1132);
+            break;
+        case 1132:   // build the menus, open the list, let the open animation finish
+            var _bc2 = instance_find(obj_battle_controller, 0);
+            if (_s.t == 1) {
+                Battle_MenusBuild(_bc2);
+                if (_o.di != 2) {
+                    Battle_OpenList(_bc2, BSTATE_SKILL_MENU);
+                    _bc2.ui_skill.cursor = (_o.di == 0) ? 0 : 2;
+                }
+            }
+            if (_o.di != 2 && _s.t >= 2) _bc2.ui_skill.opened_ms = current_time - 1000;
+            if (_s.t >= 18) {
+                var _tag = _scenes[_o.di] + "_" + string(window_get_width()) + "x" + string(window_get_height());
+                var _mt = Ui_Metrics();
+                if (_o.di != 2) {
+                    var _m = _bc2.ui_skill;
+                    var _n = array_length(_m.items);
+                    var _vis = 0;
+                    for (var _r = 0; _r < array_length(_m.rects); _r++) if (_m.rects[_r].w > 0) _vis++;
+                    Scenario_Check("shots_r4final1_the_list_is_open_" + _tag, _bc2.battle_state == BSTATE_SKILL_MENU && _n >= ((_o.di == 0) ? 1 : 4), "state=" + string(_bc2.battle_state) + " n=" + string(_n));
+                    Scenario_Check("shots_r4final1_two_rows_are_shown_when_there_are_two_" + _tag, _n < 2 || _vis >= 2, "rows=" + string(_vis) + " of " + string(_n));
+                    var _hr = Battle_ListHintRect(_m.det_rect, BSTATE_SKILL_MENU, _m.hint_hidden);
+                    Scenario_Check("shots_r4final1_the_hint_is_on_screen_" + _tag, _hr.w <= 0 || (_hr.x >= 0 && _hr.x + _hr.w <= _mt.gw), json_stringify(_hr));
+                }
+                _s.shot = "shot_r4final1_" + _tag + ".png";
+                Scenario_ShotLayout(_s.shot);
+                Scenario_Next(_s, 1133);
+            }
+            break;
+        case 1133:
+            if (_s.t >= 3) {
+                Scenario_Check("shots_saved_" + _s.shot, file_exists(_s.shot));
+                _o.si++;
+                if (_o.si >= array_length(_scales)) { _o.si = 0; _o.di++; }
+                if (_o.di >= array_length(_scenes)) {
+                    Loc_SetLanguage("en");
+                    Scenario_SetWindowScale(3);
+                    Scenario_MouseEnd();   // the end of the pictures
+                } else {
+                    Scenario_Next(_s, 1130);
                 }
             }
             break;
