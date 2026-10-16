@@ -3,7 +3,7 @@ Updated after every step that lands. The full build list is `.planning/BUILD-PLA
 Build: READY - playtest build 7f4d08e-20261016 (all of round 3: D140-D165); agents keep improving on `next` | Release then stop (D28)
 
 ## Now — PLAYTEST NOW
-- Play: `E:\Games\DD-Project Playtestf4d08e-20261016\DD-Project.exe` (your saves carry over; old builds 943ce6d and earlier can be deleted).
+- Play: `E:\Games\DD-Project Playtest\7f4d08e-20261016\DD-Project.exe` (your saves carry over; old builds 943ce6d and earlier can be deleted).
 - Checklist: `.planning/PLAYTEST-QUEUE.md`, section "Build 7f4d08e-20261016" — 58 items in play order + 5 questions at the end. Mark good / bad / change, then say "merge the good ones".
 - In this build: one Esc/Tab menu, Yes/No pop-up, seed entry, class screen + skill memory + echo, hold-to-skip, notes + Codex reader + note question, flavour choices, lighting (lighter, daylight rooms, sun spots, more torches, enemies give no light), smarter map AI, level-up choice, status labels + XP bar + Help, device-aware prompts, the full text rewrite + one word per meaning, the UI style pass, 3 battle backgrounds, and 19 bug fixes from tonight's hunts and review. Full gate PASS on every merge (unit, smoke, bot fight, 286 screenshots).
 - Known: a few long texts can still crowd a panel (fixed on `next`, lands in the next build). The boss keeps the old background until you import D13 (below).
@@ -23,7 +23,7 @@ Build: READY - playtest build 7f4d08e-20261016 (all of round 3: D140-D165); agen
 
 ## Waiting on you (whenever convenient; close GameMaker afterwards)
 - **Import the boss background** (5 min, GameMaker, project in `E:\Github_Projects\DD-Project-GameMaker-wt
-ext`): Sprites → Create → Sprite, name `spr_battle_bg_boss`, Import `artattle_bg\candidates\D13.png` (160 x 144), Origin Top Left, Ctrl+S, close GameMaker, tell me "imported".
+ext`): Sprites → Create → Sprite, name `spr_battle_bg_boss`, Import `art\battle_bg\candidates\D13.png` (160 x 144), Origin Top Left, Ctrl+S, close GameMaker, tell me "imported".
 - **Pick ideas** for after the playtest: `.planning/IDEAS.md` (25 ideas, my top 5 at the end). Reply with the ids you want.
 - **5 quick questions** at the end of the playtest checklist (battle menu read-only in fights, the Stranger loot rule, the reworded chest lines, QTE grade capitals, a real refuse sound).
 - Final cleanup (optional, at the end): delete unused sprites `spr_attack_timing_target`, `spr_attack_timing_falling` in GameMaker.
