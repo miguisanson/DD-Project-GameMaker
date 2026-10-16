@@ -10601,6 +10601,7 @@ function Scenario_StepSmokeRunStats(_s) {
                 var _e = global.run_flow.entry;
                 var _rows = RunFlow_SummaryRows(_e);
                 Scenario_Check("g9_the_summary_is_up", global.run_flow.phase == "summary");
+                Scenario_Check("r3title_an_abandoned_run_shows_an_abandoned_run_title", variable_struct_exists(global.run_flow, "title") && Test_ArrHasStr(Test_R3TitleKeys(RunTitle_Pool("abandoned", Profile_Get().deaths)), global.run_flow.title.key), variable_struct_exists(global.run_flow, "title") ? string(global.run_flow.title.key) : "no title");   // D183 (R-105)
                 Scenario_Check("g9_the_summary_shows_fights_won_1", Test_RowValue(_rows, _fw) == "1", "got " + Test_RowValue(_rows, _fw));
                 Scenario_Check("g9_the_summary_shows_the_damage_dealt", Test_RowValue(_rows, _dd) == string(_rs.snap.dmg_dealt) && _rs.snap.dmg_dealt > 0, "got " + Test_RowValue(_rows, _dd) + " want " + string(_rs.snap.dmg_dealt));
                 Scenario_Check("g9_the_summary_shows_the_damage_taken", Test_RowValue(_rows, _dt) == string(_rs.snap.dmg_taken), "got " + Test_RowValue(_rows, _dt) + " want " + string(_rs.snap.dmg_taken));

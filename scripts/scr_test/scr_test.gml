@@ -162,6 +162,7 @@ function Test_RunAll() {
     Test_RunSuite("R3Guard", Test_Suite_R3Guard);
     Test_RunSuite("R3Wolf", Test_Suite_R3Wolf);
     Test_RunSuite("R3Shop", Test_Suite_R3Shop);
+    Test_RunSuite("R3Title", Test_Suite_R3Title);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14203,6 +14204,45 @@ function Test_Suite_TextFit() {
         return _f;
     });
 
+    // ---- the run summary (R-105, note 27): the title, the cause line and the rows at one column and at two, for each result and class, as the draw lays them out ----
+    TextFit_Each("run summary", function(_w, _h, _l) {
+        var _f = [];
+        var _mt = Ui_Metrics();
+        var _p = _mt.p;
+        var _cls = [CLASS_KNIGHT, CLASS_ARCHER, CLASS_MAGE, CLASS_NOBODY];
+        var _res = ["died", "abandoned", "won"];
+        var _foe = EnemyDB_Get(ENEMY_FINAL_BOSS).name;
+        var _run = Run_Create(99999999);
+        _run.kills = 9999;
+        _run.stats = { qte_total: 9999, qte_perfect: 9999, crits: 9999, dmg_dealt: 999999, dmg_taken: 999999, fights_won: 999, play_ms: 359999000 };
+        var _titles = RunTitle_All();
+        for (var _t = 0; _t < array_length(_titles); _t++) TextFit_Line(_f, "run summary title", RunTitle_Text(_titles[_t]), _mt.gw - 2 * _mt.margin);
+        for (var _c = 0; _c < array_length(_cls); _c++) {
+            for (var _r = 0; _r < array_length(_res); _r++) {
+                var _ch = CharacterCreate_Player(_cls[_c]);
+                _ch.level = LEVEL_CAP;
+                var _entry = Run_MakeHistoryEntry(_run, _ch, "rm_floor9", _res[_r], (_res[_r] == "died") ? _foe : "");
+                var _rows = RunFlow_SummaryRows(_entry);
+                var _sentence = RunFlow_CauseLine(_entry);
+                var _tag = "run summary (" + _res[_r] + ", class " + string(_cls[_c]) + ")";
+                for (var _cols = 1; _cols <= 2; _cols++) {   // the draw's own choice: one column, two when the one-column panel is too tall
+                    var _pw = (_cols == 1) ? min(_mt.gw - 2 * _mt.margin, round(_mt.gw * 0.62)) : min(_mt.gw - 2 * _mt.margin, round(_mt.gw * 0.9));
+                    var _dh = Ui_DetailsHeight(_pw, _sentence, _rows, _cols);
+                    var _total = _mt.line_h + 3 * _p + _dh + 3 * _p + _mt.line_h;
+                    var _inner = _pw - 8 * _p;
+                    var _col_w = (_inner - (_cols - 1) * 3 * _p) / _cols;
+                    TextFit_Block(_f, _tag + " cause line (" + string(_cols) + " col)", _sentence, _inner, _p);
+                    for (var _i = 0; _i < array_length(_rows); _i++) {
+                        TextFit_Line(_f, _tag + " value of '" + string(_rows[_i].label) + "' (" + string(_cols) + " col)", _rows[_i].value, _col_w + 2 * _p);
+                        if (UI_TextWidth(_rows[_i].label) > _col_w) TextFit_Block(_f, _tag + " label (" + string(_cols) + " col)", _rows[_i].label, _col_w, _p);
+                    }
+                    if (_cols == 2 && _total > _mt.gh - 2 * _mt.margin) array_push(_f, _tag + " two columns need " + string(_total) + " of " + string(_mt.gh - 2 * _mt.margin));
+                }
+            }
+        }
+        return _f;
+    });
+
     // ---- the rows the text side has to shorten are still too long (an entry that matches nothing is deleted from TextFit_Known) ----
     var _known = TextFit_Known();
     for (var _e = 0; _e < array_length(_known); _e++) {
@@ -16386,4 +16426,94 @@ function Test_Suite_R3Shop() {
     Test_True("r3shop: a sold-out row is dim and says Sold Out, not the bag reason", _r6.dim && _r6.value == Loc_T("shop.sold_out", "Sold Out") && string_pos(_full_txt, _r6.help) == 0);
 
     if (_had_run) _gs.run = _old_run; else variable_struct_remove(_gs, "run");
+}
+
+// ---- R3 guardsmall item 4 (D183, R-105, owner note 26): the run-end title varies by death tier, with its own titles for a win and for an abandoned run, and is never the same twice in a row for a profile. ----
+function Test_Suite_R3Title() { Test_ProfRun("tpt_", Test_R3TitleRun); }
+
+function Test_R3TitleKeys(_pool) {
+    var _k = [];
+    for (var _i = 0; _i < array_length(_pool); _i++) array_push(_k, _pool[_i].key);
+    return _k;
+}
+
+function Test_ArrHasStr(_arr, _s) {
+    for (var _i = 0; _i < array_length(_arr); _i++) if (_arr[_i] == _s) return true;
+    return false;
+}
+
+function Test_R3TitleRun(_prefix) {
+    var _tiers = [1, 2, 4, 7, 11];   // a death count in each tier (1st, 2nd-3rd, 4th-6th, 7th-10th, 11th on)
+    var _all_keys = {};
+    var _lines_ok = true;
+    for (var _t = 0; _t < array_length(_tiers); _t++) {
+        var _pool = RunTitle_Pool("died", _tiers[_t]);
+        Test_True("r3title: death " + string(_tiers[_t]) + " has at least 3 titles to pick from (" + string(array_length(_pool)) + ")", array_length(_pool) >= 3);
+        var _keys = Test_R3TitleKeys(_pool);
+        for (var _k = 0; _k < array_length(_keys); _k++) {
+            if (variable_struct_exists(_all_keys, _keys[_k])) _lines_ok = false;   // a title belongs to one tier only
+            variable_struct_set(_all_keys, _keys[_k], true);
+        }
+    }
+    Test_True("r3title: the five death tiers share no title", _lines_ok);
+    var _win = Test_R3TitleKeys(RunTitle_Pool("won", 5));
+    var _ab = Test_R3TitleKeys(RunTitle_Pool("abandoned", 5));
+    Test_True("r3title: a win has at least 2 titles of its own", array_length(_win) >= 2);
+    Test_True("r3title: an abandoned run has at least 2 titles of its own", array_length(_ab) >= 2);
+    var _shared = false;
+    for (var _w = 0; _w < array_length(_win); _w++) if (variable_struct_exists(_all_keys, _win[_w]) || Test_ArrHasStr(_ab, _win[_w])) _shared = true;
+    for (var _a = 0; _a < array_length(_ab); _a++) if (variable_struct_exists(_all_keys, _ab[_a])) _shared = true;
+    Test_False("r3title: the win and abandoned titles are not death titles, nor each other's", _shared);
+
+    // never the last title again, whatever the salt
+    var _again = false;
+    var _results = ["died", "abandoned", "won"];
+    for (var _r = 0; _r < 3; _r++) {
+        var _pl = RunTitle_Pool(_results[_r], 5);
+        if (array_length(_pl) < 2) _again = true;   // with one title there is no other to pick
+        for (var _l = 0; _l < array_length(_pl); _l++) {
+            for (var _salt = 0; _salt < 12; _salt++) if (RunTitle_Pick(_results[_r], 5, _pl[_l].key, _salt).key == _pl[_l].key) _again = true;
+        }
+    }
+    Test_False("r3title: a pick is never the title shown last", _again);
+    var _seen = {};
+    for (var _salt2 = 0; _salt2 < 12; _salt2++) variable_struct_set(_seen, RunTitle_Pick("died", 2, "", _salt2).key, true);
+    Test_True("r3title: across salts every title of a tier comes up", array_length(variable_struct_get_names(_seen)) == array_length(RunTitle_Pool("died", 2)) && array_length(RunTitle_Pool("died", 2)) >= 3);
+
+    // the real choice, through the profile: twelve deaths in a row, the same tier several times
+    var _prof = Profile_Get();
+    var _prev = "";
+    var _same = 0;
+    var _stored = true;
+    for (var _d = 1; _d <= 12; _d++) {
+        _prof.deaths = _d;
+        var _pick = RunTitle_Choose({ result: "died", seed: 1000 + _d });
+        if (_pick.key == _prev) _same++;
+        if (!variable_struct_exists(Profile_Get(), "last_title") || Profile_Get().last_title != _pick.key) _stored = false;
+        _prev = _pick.key;
+    }
+    Test_Eq("r3title: twelve deaths in a row never show the same title twice running", _same, 0);
+    Test_True("r3title: the profile keeps the key of the title it showed last", _stored);
+    Profile_Flush();
+    Test_ProfRelaunch();
+    Test_True("r3title: ... also after a relaunch (it is in the profile file)", variable_struct_exists(Profile_Get(), "last_title") && Profile_Get().last_title == _prev);
+    var _p2 = Profile_Get();
+    _p2.deaths = 5;
+    var _same2 = 0;
+    var _prev2 = _prev;
+    for (var _n = 0; _n < 8; _n++) {   // eight run ends in the same tier with the same seed, one after another
+        var _pk = RunTitle_Choose({ result: "died", seed: 7 });
+        if (_pk.key == _prev2) _same2++;
+        _prev2 = _pk.key;
+    }
+    Test_Eq("r3title: the same tier and the same seed still never repeat", _same2, 0);
+
+    // a win and an abandoned run show their own titles
+    var _tw = RunTitle_Choose({ result: "won", seed: 3 });
+    Test_True("r3title: a won run shows a win title", Test_ArrHasStr(_win, _tw.key));
+    var _tw2 = RunTitle_Choose({ result: "won", seed: 3 });
+    Test_True("r3title: and a second win shows another", _tw2.key != _tw.key && Test_ArrHasStr(_win, _tw2.key));
+    var _ta = RunTitle_Choose({ result: "abandoned", seed: 3 });
+    Test_True("r3title: an abandoned run shows an abandoned-run title", Test_ArrHasStr(_ab, _ta.key));
+    Test_True("r3title: the text is a real sentence in the language of the moment", string_length(RunTitle_Text(_ta)) > 3);
 }

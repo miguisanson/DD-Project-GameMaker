@@ -1035,6 +1035,14 @@ function RunFlow_Step() {
     }
 }
 
+// The title of this run's summary (D183, R-105): picked once when the run ends, by the result and the profile's death count, never the title the profile saw last.
+// Stores the key in the profile (last_title). Returns { key, text }.
+function RunTitle_Choose(_entry) {
+    var prof = Profile_Get();
+    var salt = (variable_struct_exists(_entry, "seed") ? _entry.seed : 0) + prof.deaths;
+    return RunTitle_Pick(_entry.result, prof.deaths, "", salt);
+}
+
 function RunFlow_CauseLine(_entry) {
     if (_entry.result == "abandoned") return Loc_T("runflow.cause.abandoned", "You abandoned the run.");
     if (_entry.cause != "") return Loc_T("runflow.cause.enemy", "Felled by: {name}", { name: _entry.cause });

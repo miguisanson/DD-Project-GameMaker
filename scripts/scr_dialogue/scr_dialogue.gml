@@ -1567,6 +1567,25 @@ function DeathLine_Format(_pick, _killer_name) {
     return Loc_T(_pick.key, _pick.text, { killer: nm });
 }
 
+// ---- the run-end title (D183, R-105): the title over the run summary ----
+// Contract: RunTitle_All() every title { key, text }; RunTitle_Pool(_result, _deaths) the titles that may show for a run that ended with _result ("died", "abandoned",
+// "won") when the profile has _deaths deaths; RunTitle_Pick(_result, _deaths, _last_key, _salt) one of them, never _last_key while the pool has another; RunTitle_Text(_pick).
+function RunTitle_All() {
+    return [{ key: "runflow.title", text: "The tunnel keeps you." }];
+}
+
+function RunTitle_Pool(_result, _deaths) {
+    return RunTitle_All();
+}
+
+function RunTitle_Pick(_result, _deaths, _last_key, _salt) {
+    return RunTitle_Pool(_result, _deaths)[0];
+}
+
+function RunTitle_Text(_pick) {
+    return Loc_T(_pick.key, _pick.text);
+}
+
 // How long the line stays up: 2 s at least, 4 s at most, longer for longer lines (D103).
 function DeathScene_Frames(_text, _fps) {
     return clamp(round(_fps * (1.4 + string_length(_text) * 0.05)), _fps * 2, _fps * 4);
