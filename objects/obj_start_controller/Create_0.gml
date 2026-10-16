@@ -2,6 +2,9 @@
 title_stk = undefined;
 title_exit = undefined;      // { at }: New Game was chosen, the run starts when the title menu has faded
 title_refresh = true;        // relabel the title items (language or save files may have changed)
+title_new_slot = -1;         // D175: the save file New Game will use (committed by Title_NewGameGo)
+title_new_wipe = false;      // D175: that file is emptied first (the overwrite picker asked)
+title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };   // D175: where the picker's key line was drawn last (-shots)
 title_t0 = -100000;          // D128: when the picture started to fade in (a fresh launch sets it when the splash appears; every other visit shows it at once)
 title_card = { kind: "none", status: "missing", class_name: "", floor: 0, gold: 0, time_ms: -1 };   // D128: the Continue card's model (Title_Build / Title_Refresh)
 title_card_rect = { x: 0, y: 0, w: 0, h: 0 };     // where the card and the splash prompt were drawn last (the -shots checks read them)

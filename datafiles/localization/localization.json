@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T09:53:40Z",
-    "row_count": 1211
+    "generated_at_utc": "2026-10-16T11:19:46Z",
+    "row_count": 1224
   },
   "default_lang": "en",
   "languages": [
@@ -3548,6 +3548,26 @@
       "en": "Delete",
       "ko": "삭제"
     },
+    "save.delete.ask": {
+      "en": "Delete Save {n}? The run in it will be lost.",
+      "ko": "저장 {n}을(를) 삭제할까요? 그 안의 도전은 사라집니다."
+    },
+    "save.hint.delete": {
+      "en": "[k:tab_prev] Delete",
+      "ko": "[k:tab_prev] 삭제"
+    },
+    "save.hint.load": {
+      "en": "[k:confirm] Load",
+      "ko": "[k:confirm] 불러오기"
+    },
+    "save.hint.overwrite": {
+      "en": "[k:confirm] Overwrite",
+      "ko": "[k:confirm] 덮어쓰기"
+    },
+    "save.lbl.saved": {
+      "en": "Last Saved",
+      "ko": "마지막 저장"
+    },
     "save.legacy.notice": {
       "en": "Saves from the earlier version cannot be loaded in this one. They have been left untouched. Start a new run.",
       "ko": "이전 버전의 저장 파일은 이 버전에서 불러올 수 없습니다. 파일은 그대로 두었습니다. 새 도전을 시작하세요."
@@ -3563,6 +3583,38 @@
     "save.msg.no_saved_games_found": {
       "en": "No saved games found.",
       "ko": "저장된 게임이 없습니다."
+    },
+    "save.overwrite.ask": {
+      "en": "Overwrite Save {n}? The run in it will be lost.",
+      "ko": "저장 {n}을(를) 덮어쓸까요? 그 안의 도전은 사라집니다."
+    },
+    "save.overwrite.title": {
+      "en": "Overwrite which save file?",
+      "ko": "어느 저장 파일을 덮어쓸까요?"
+    },
+    "save.slot.cant": {
+      "en": "Cannot load",
+      "ko": "불러올 수 없음"
+    },
+    "save.slot.empty": {
+      "en": "Empty",
+      "ko": "비어 있음"
+    },
+    "save.slot.help_empty": {
+      "en": "No run is saved in this file.",
+      "ko": "이 파일에는 저장된 도전이 없습니다."
+    },
+    "save.slot.help_load": {
+      "en": "Pick up this run where you left it.",
+      "ko": "중단한 곳에서 이 도전을 이어갑니다."
+    },
+    "save.slot.help_over": {
+      "en": "A new game here replaces this run.",
+      "ko": "여기서 새 게임을 시작하면 이 도전은 사라집니다."
+    },
+    "save.slot.name": {
+      "en": "Save {n}",
+      "ko": "저장 {n}"
     },
     "save.slot.prefix": {
       "en": "Slot",

@@ -5141,10 +5141,10 @@ function Test_Suite_UI() {
     _pw.window_mode = WINDOW_MODE_WINDOWED;
     Test_True("D0 scale row is live while windowed", SettingsMenu_Items(_pw, 16)[8].enabled);
     Test_True("D100 every settings row has a plain help sentence", string_length(_si[0].help) > 0 && string_length(_si[7].help) > 0 && string_length(_si[10].help) > 0);
-    var _tm = Title_MainItems(false);
-    Test_Eq("D0 title menu has four items", array_length(_tm), 4);
-    Test_False("D0 Load Game is greyed with no save", _tm[1].enabled);
-    Test_True("D0 Load Game is live with a save", Title_MainItems(true)[1].enabled);
+    var _tm = Title_MainItems(false, false);   // D175: Continue, New Game, Load Game, Settings, Quit
+    Test_Eq("D0 title menu has five items (D175)", array_length(_tm), 5);
+    Test_False("D0 Load Game is greyed with no save", _tm[2].enabled);
+    Test_True("D0 Load Game is live with a save", Title_MainItems(false, true)[2].enabled);
 }
 
 // ---- C2: cards (D18, D34, D73, D76, D81-D83, D88, D100) ----------------------------------------------------------------------
@@ -10947,41 +10947,29 @@ function Test_ConfirmSystem() {
     Test_Eq("H2 the Abandon question is the same in a fight", TabSystem_Question("abandon", true), "Abandon this run? It counts as a death, but you keep the echo.");
 }
 
+// D175 amends D156 here: New Game no longer asks "abandon the saved run?": the first EMPTY save file takes the run, and only with all three used the overwrite picker asks
+// (then Yes / No). The shared pop-up itself is checked in Test_ConfirmCore; the new flow in Test_Suite_R3Saves2.
 function Test_ConfirmNewGame() {
     Test_ConfirmReset();
-    // the title controller as far as New Game needs it: a menu stack with the title menu on it. D156 asks first (a run is saved), D152 then offers the seed pick,
-    // and only after that pick does the title fade out.
+    Test_ProfRun("tqc_", Test_ConfirmNewGameBody);
+}
+
+function Test_ConfirmNewGameBody(_p) {
+    Test_ProfPutRun(_p + "run_0_0.sav", 3, 71, CLASS_KNIGHT, 2, 1, 1000, 5);
     var _c = { title_exit: undefined, title_stk: Ui_StackNew(), title_seed: undefined };
-    var _m = Ui_MenuNew("test_h2_title", Title_MainItems(true), { owner: _c });
+    var _m = Ui_MenuNew("test_h2_title", Title_MainItems(true, true), { owner: _c });
     Ui_StackPush(_c.title_stk, _m);
-    Title_NewPress(_c, _m, true);
-    Test_True("H2 New Game over a saved run opens the pop-up", Confirm_IsOpen());
-    Test_Eq("H2 the New Game question", Confirm_Question(), "Start a new game? The saved run will be abandoned.");
-    Test_Eq("H2 the New Game pop-up starts on No", Confirm_Menu().cursor, 1);
-    Test_False("H2 the first press starts no game", is_struct(_c.title_exit));
-    Test_Eq("H2 the first press opens no seed pick yet", Ui_StackDepth(_c.title_stk), 1);
-    Test_Eq("H2 the row still reads New game", _m.items[0].label, "New Game");
-    Test_False("H2 no armed flag is set by the press", variable_struct_exists(_c, "title_new_armed"));
-    Confirm_Back();
-    Test_False("H2 No starts no game", is_struct(_c.title_exit));
-    Test_Eq("H2 No opens no seed pick", Ui_StackDepth(_c.title_stk), 1);
-    Title_NewPress(_c, _m, true);
-    Test_True("H2 New Game Yes is answered", Test_ConfirmSayYes());
-    Test_False("H2 Yes does not start the game yet: the seed pick comes first (D152)", is_struct(_c.title_exit));
-    Test_Eq("H2 Yes opens the seed pick over the title menu", Ui_StackTop(_c.title_stk).id, "seed_choice");
+    Title_NewPress(_c, _m);
+    Test_False("H2 New Game over a saved run asks no abandon question any more (D175: it takes the next empty save file)", Confirm_IsOpen());
+    Test_Eq("H2 it opens the seed pick over the title menu", Ui_StackTop(_c.title_stk).id, "seed_choice");
     Test_Eq("H2 the seed pick is on top of the title menu", Ui_StackDepth(_c.title_stk), 2);
+    Test_False("H2 the first press starts no game", is_struct(_c.title_exit));
+    Test_Eq("H2 the row still reads New Game", _m.items[1].label, "New Game");
+    Test_False("H2 no armed flag is set by the press", variable_struct_exists(_c, "title_new_armed"));
     Title_SeedChoiceConfirm(Ui_StackTop(_c.title_stk), 0);   // Random seed
     Test_True("H2 the Random seed pick starts the new game", is_struct(_c.title_exit));
     Test_True("H2 and the title menu starts to close", _m.closed_ms >= 0);
-    var _c2 = { title_exit: undefined, title_stk: Ui_StackNew(), title_seed: undefined };
-    var _m2 = Ui_MenuNew("test_h2_title2", Title_MainItems(false), { owner: _c2 });
-    Ui_StackPush(_c2.title_stk, _m2);
-    Title_NewPress(_c2, _m2, false);
-    Test_False("H2 New Game with no saved run asks nothing", Confirm_IsOpen());
-    Test_Eq("H2 and goes to the seed pick at once", Ui_StackTop(_c2.title_stk).id, "seed_choice");
-    Test_False("H2 without starting the game before the pick", is_struct(_c2.title_exit));
-    Title_SeedChoiceConfirm(Ui_StackTop(_c2.title_stk), 0);
-    Test_True("H2 the pick starts it", is_struct(_c2.title_exit));
+    Test_True("H2 the saved run in save 1 is not abandoned by it", RunSave_ExistsAt(_p + "run_0_0.sav"));
     global.run_next_seed = undefined;
 }
 
@@ -11106,7 +11094,7 @@ function Test_ConfirmNoArmed() {
     Test_True("H2 Title_NewArmed is gone", asset_get_index("Title_NewArmed") == -1);
     Test_True("H2 Title_DisarmNew is gone", asset_get_index("Title_DisarmNew") == -1);
     Test_Eq("H2 the Abandon row never reads Sure", TabSystem_Items()[1].label, "Abandon Run");
-    Test_Eq("H2 the title row never reads Sure", Title_MainItems(true)[0].label, "New Game");
+    Test_Eq("H2 the title row never reads Sure", Title_MainItems(true, true)[1].label, "New Game");
     var _gs = Test_Hero(CLASS_KNIGHT);
     var _mem = Ui_MemGet(Ui_MemGlobal(), "tab_menu_active", TabMenu_Count());
     Menu_Open(6);
@@ -15573,7 +15561,7 @@ function Test_R3s2State(_p) {
 function Test_R3s2Rows(_p) {
     var _t = date_create_datetime(2026, 10, 16, 14, 5, 0);
     Test_ProfPutRun(_p + "run_0_0.sav", 3, 21, CLASS_KNIGHT, 3, 2, 9000, _t);
-    Test_ProfPutRun(_p + "run_0_1.sav", 4, 22, CLASS_MAGE, 3, 2, 9000, _t);   // a version this build does not know: "newer"
+    Test_RawWrite(_p + "run_0_1.sav", Test_ProfRunText(4, 22, CLASS_MAGE, 3, 2, 9000, _t));   // a version this build does not know: "newer" (written raw: the atomic writer would refuse it)
     var _rows = Title_SlotRows(Slots_Summary(0), "load");
     Test_Eq("saves2 rows: one row per save file", array_length(_rows), 3);
     Test_Eq("saves2 rows: the first label", _rows[0].label, "Save 1");

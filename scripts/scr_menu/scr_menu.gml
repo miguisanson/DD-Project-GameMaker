@@ -3344,72 +3344,236 @@ function SettingsPopup_Draw(_draw_backdrop = true) {
 }
 
 // --------------------
-// TITLE MENU (D0 pilot on the UI framework)
+// TITLE MENU (D0 pilot on the UI framework; D175: profiles and three save files)
 // --------------------
 // obj_start_controller keeps `state` ("main" | "settings" | "boot_logo" | "splash" | "cutscene") and holds the menu stack in title_stk: [title].
-// Settings is the popup above. New Game starts the run at once on Normal (D35: one difficulty only); over a saved run it asks first (D156).
-function Title_MainItems(_can_load) {
+// The rows (D175): Continue (the active profile's last played save file), New Game (the first empty save file, or a picker "Overwrite which save file?" when all
+// three are used), Load Game (a picker of the three save files), Settings, Quit. New Game starts the run on Normal (D35: one difficulty only) after the seed pick.
+function Title_Pad2(_n) {
+    return ((_n < 10) ? "0" : "") + string(_n);
+}
+
+// "Save 1" .. "Save 3".
+function Title_SlotName(_slot) {
+    return Loc_T("save.slot.name", "Save {n}", { n: string(_slot + 1) });
+}
+
+// A save's stamp as "2026-10-16 14:05"; "-" when the file has none (a datetime of a run file is a real, -1 when missing).
+function Title_FormatSaved(_dt) {
+    if (!is_real(_dt) || _dt <= 0) return "-";
+    return string(date_get_year(_dt)) + "-" + Title_Pad2(date_get_month(_dt)) + "-" + Title_Pad2(date_get_day(_dt)) + " " + Title_Pad2(date_get_hour(_dt)) + ":" + Title_Pad2(date_get_minute(_dt));
+}
+
+// What the title needs to know about a profile's save files (the active one by default): { pid, cont (the Continue target, -1 = none), first_empty (-1 = all used),
+// any (some file exists, even a damaged one: Load Game is on), slots (Slots_Summary) }. Reads the files.
+function Title_State(_pid = undefined) {
+    var pid = is_undefined(_pid) ? Profiles_Active() : _pid;
+    var sl = Slots_Summary(pid);
+    var any = false;
+    var first = -1;
+    for (var i = 0; i < array_length(sl); i++) {
+        if (sl[i].exists) any = true;
+        else if (first < 0) first = sl[i].slot;
+    }
+    return { pid: pid, cont: Slots_ContinueTarget(pid), first_empty: first, any: any, slots: sl };
+}
+
+function Title_MainItems(_can_continue, _can_load) {
     return [
+        { id: "continue", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_continue },   // C1 (D46): Continue run; D175: the last played save file
         { id: "new", label: Loc_T("menu.main.option.0", "New Game"), kind: "button", enabled: true },
-        { id: "load", label: Loc_T("menu.main.option.continue", "Continue"), kind: "button", enabled: _can_load },   // C1 (D46): Continue run
+        { id: "load", label: Loc_T("menu.main.option.1", "Load Game"), kind: "button", enabled: _can_load },
         { id: "settings", label: Loc_T("menu.main.option.2", "Settings"), kind: "button", enabled: true },
         { id: "exit", label: Loc_T("menu.main.option.3", "Quit Game"), kind: "button", enabled: true }
     ];
 }
 
+// New Game's plan from the first empty save file (-1 = none): { kind: "start", slot } or { kind: "overwrite", slot: -1 } (the picker asks which file to give up).
+function Title_NewPlan(_first_empty) {
+    if (_first_empty >= 0) return { kind: "start", slot: _first_empty };
+    return { kind: "overwrite", slot: -1 };
+}
+
+// The card of the Continue target's run (D128: read, never applied).
+function Title_CardOf(_st) {
+    return (_st.cont >= 0) ? Title_CardLoad(Slots_PathOf(_st.pid, _st.cont)) : Title_CardNone();
+}
+
 function Title_Build(_c) {
     _c.title_stk = Ui_StackNew();
-    var has_run = RunSave_HasSave();
-    var m = Ui_MenuNew("title", Title_MainItems(has_run), {
+    var st = Title_State();
+    var m = Ui_MenuNew("title", Title_MainItems(st.cont >= 0, st.any), {
         owner: _c, on_confirm: Title_OnConfirm,
         layout: { anchor: "bottom", y_frac: 0.62, center: true }
     });
-    if (has_run) Ui_MenuFixCursor(m, 1);   // review 1: with a run saved the cursor starts on Continue, not on New Game
+    Ui_MenuFixCursor(m, (st.cont >= 0) ? 0 : 1);   // review 1: with a run saved the cursor starts on Continue, else on New Game
     Ui_StackPush(_c.title_stk, m);
     _c.title_refresh = false;
     _c.title_seed = undefined;   // D152: the seed entry screen (a SeedEntry struct while it is open)
-    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();   // D128: read, never applied
+    _c.title_card = Title_CardOf(st);   // D128: read, never applied
 }
 
 // Language or save files may have changed since the labels were made.
 function Title_Refresh(_c) {
     var m = _c.title_stk.menus[0];
-    var has_run = RunSave_HasSave();
-    m.items = Title_MainItems(has_run);
+    var st = Title_State();
+    m.items = Title_MainItems(st.cont >= 0, st.any);
     Ui_MenuFixCursor(m, m.cursor);
     _c.title_refresh = false;
-    _c.title_card = has_run ? Title_CardLoad() : Title_CardNone();
+    _c.title_card = Title_CardOf(st);
 }
 
-// D35: no difficulty menu. D152: New Game goes on to the seed pick (Random seed first, or Enter seed); the title fades out after that pick (Title_NewGameGo),
-// then the run (or the intro cutscene) is requested.
-function Title_NewGo(_c, _m) {
-    Title_SeedChoiceOpen(_c);
+// ---- save files: the Load Game picker and the overwrite picker (D175) ----
+// The rows of a picker from Slots_Summary entries. _mode "load": an empty file is greyed; "overwrite": every file is a row you can pick. A file this build cannot read
+// (newer, old, damaged) reads "Cannot load" and can still be selected, so it can be deleted. { id, slot, label, value, status, enabled, dim, help, lines }.
+function Title_SlotRows(_sums, _mode) {
+    var rows = [];
+    for (var i = 0; i < array_length(_sums); i++) {
+        var sm = _sums[i];
+        var row = { id: "slot_" + string(sm.slot), slot: sm.slot, label: Title_SlotName(sm.slot), value: "", status: sm.status, kind: "button", enabled: true, dim: false, help: "", lines: [], hint: "" };
+        if (sm.status == "empty") {
+            row.value = Loc_T("save.slot.empty", "Empty");
+            row.enabled = (_mode != "load");
+            row.dim = true;
+            row.help = Loc_T("save.slot.help_empty", "No run is saved in this file.");
+        } else if (sm.status == "ok") {
+            var cname = DB_PlayerClass(sm.class_id).name;
+            row.value = (sm.level >= 0) ? Loc_T("tab.hist.row", "{cls} Lv {n}", { cls: string(cname), n: string(floor(sm.level)) }) : string(cname);
+            row.help = (_mode == "overwrite") ? Loc_T("save.slot.help_over", "A new game here replaces this run.") : Loc_T("save.slot.help_load", "Pick up this run where you left it.");
+            if (sm.floor >= 0) array_push(row.lines, { label: Loc_T("tab.lbl.floor", "Floor"), value: string(floor(sm.floor)) });
+            if (sm.run_time_ms >= 0) array_push(row.lines, { label: Loc_T("title.card.time", "Time"), value: Title_FormatTime(sm.run_time_ms) });
+            array_push(row.lines, { label: Loc_T("save.lbl.saved", "Last Saved"), value: Title_FormatSaved(sm.saved_at) });
+        } else {
+            row.value = Loc_T("save.slot.cant", "Cannot load");
+            row.dim = true;
+            row.help = Run_ContinueFailText(sm.status);
+        }
+        array_push(rows, row);
+    }
+    return rows;
 }
 
-function Title_NewYes(_d) {
-    Title_NewGo(_d.c, _d.m);
+// Opens a picker above the title menu: "load" (Load Game) or "overwrite" (New Game with all three files used). The cursor starts on the first row you can pick.
+function Title_PickerOpen(_c, _mode) {
+    var st = Title_State();
+    var m = Ui_MenuNew("slots_" + _mode, Title_SlotRows(st.slots, _mode), {
+        owner: _c, on_confirm: Title_PickerConfirm, data: { mode: _mode },
+        layout: { title: (_mode == "overwrite") ? Loc_T("save.overwrite.title", "Overwrite which save file?") : Loc_T("menu.main.option.1", "Load Game"), anchor: "center", details: true, hides_below: true }
+    });
+    Ui_MenuFixCursor(m, 0);
+    Ui_StackPush(_c.title_stk, m);
+    return m;
 }
 
-// New Game: a saved run is abandoned by it (review 1), so with one saved the shared Yes / No pop-up asks first (D156); otherwise it starts at once.
-function Title_NewPress(_c, _m, _has_run) {
-    if (_has_run) {
-        Confirm_Open(Loc_T("confirm.new_game", "Start a new game? The saved run will be abandoned."), Title_NewYes, { c: _c, m: _m });
+function Title_IsPicker(_m) {
+    return is_struct(_m) && is_struct(_m.data) && variable_struct_exists(_m.data, "mode") && (_m.id == "slots_load" || _m.id == "slots_overwrite");
+}
+
+// Loads a save file: it becomes the active one (what autosaves write to) and the run is entered. A file this build cannot read says why. Returns true when the load began.
+function Title_LoadSlot(_slot) {
+    Slot_SetActive(_slot);
+    var cont = Run_Continue();
+    if (!cont.ok) Notice_Open(Run_ContinueFailText(cont.status));
+    return cont.ok;
+}
+
+function Title_PickerConfirm(_m, _i) {
+    var c = _m.owner;
+    var row = _m.items[_i];
+    if (_m.data.mode == "overwrite") {
+        Confirm_Open(Loc_T("save.overwrite.ask", "Overwrite Save {n}? The run in it will be lost.", { n: string(row.slot + 1) }), Title_OverwriteYes, { c: c, slot: row.slot });
         return;
     }
-    Title_NewGo(_c, _m);
+    if (row.status != "ok") {
+        Notice_Open(Run_ContinueFailText(row.status));
+        return;
+    }
+    Title_LoadSlot(row.slot);
+}
+
+// Yes to "Overwrite Save n?": the file is given up when the run really starts (Title_NewGameGo), so Back from the seed pick loses nothing.
+function Title_OverwriteYes(_d) {
+    _d.c.title_new_slot = _d.slot;
+    _d.c.title_new_wipe = true;
+    Title_SeedChoiceOpen(_d.c);
+}
+
+// The delete key on a Load Game row: asks Yes / No (D175). An empty file has nothing to delete. Returns true when it asked.
+function Title_PickerDeleteAsk(_c, _m) {
+    if (!Title_IsPicker(_m) || _m.data.mode != "load" || array_length(_m.items) <= 0) return false;
+    var row = _m.items[clamp(_m.cursor, 0, array_length(_m.items) - 1)];
+    if (row.status == "empty") {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    Confirm_Open(Loc_T("save.delete.ask", "Delete Save {n}? The run in it will be lost.", { n: string(row.slot + 1) }), Title_DeleteYes, { c: _c, m: _m, slot: row.slot });
+    return true;
+}
+
+// Yes: the file goes (a run in it counts as abandoned in the history); the picker shows the new state, or closes when nothing is left to load.
+function Title_DeleteYes(_d) {
+    Slot_Delete(Profiles_Active(), _d.slot);
+    var st = Title_State();
+    _d.c.title_refresh = true;
+    if (!st.any) {
+        Ui_StackBack(_d.c.title_stk);
+        return;
+    }
+    _d.m.items = Title_SlotRows(st.slots, _d.m.data.mode);
+    Ui_MenuFixCursor(_d.m, _d.m.cursor);
+}
+
+// The keys only the pickers have, before the menu steps: the delete key (Q / the pad's LB), or a right click on a row (a right click elsewhere is Back). True when it was used.
+function Title_PickerKeys(_c, _m) {
+    if (!Title_IsPicker(_m) || _m.data.mode != "load" || current_time - _m.lock_ms < UI_INPUT_LOCK_MS) return false;
+    if (Input_Pressed("tab_prev")) return Title_PickerDeleteAsk(_c, _m);
+    if (mouse_check_button_pressed(mb_right)) {
+        var mp = Ui_MousePos();
+        var hv = Ui_HoverIndex(_m.rects, mp.x, mp.y);
+        if (hv >= 0) {
+            _m.cursor = hv;
+            return Title_PickerDeleteAsk(_c, _m);
+        }
+    }
+    return false;
+}
+
+// New Game: the first empty save file takes the run, with no question; with all three used the overwrite picker asks which one to give up (and then Yes / No). D152: the
+// seed pick follows; the title fades out after it (Title_NewGameGo), then the run (or the intro cutscene) is requested.
+function Title_NewPress(_c, _m) {
+    var plan = Title_NewPlan(Title_State().first_empty);
+    _c.title_new_slot = -1;
+    _c.title_new_wipe = false;
+    if (plan.kind == "start") {
+        _c.title_new_slot = plan.slot;
+        Title_SeedChoiceOpen(_c);
+    } else {
+        Title_PickerOpen(_c, "overwrite");
+    }
+}
+
+// Continue: the last played save file of the active profile.
+function Title_ContinuePress(_c) {
+    var t = Slots_ContinueTarget();
+    if (t < 0) {
+        SFX_PlayUI("ui_deny");
+        return false;
+    }
+    return Title_LoadSlot(t);
 }
 
 function Title_OnConfirm(_m, _i) {
     var c = _m.owner;
     var rid = _m.items[_i].id;
     switch (rid) {
-        case "new":
-            Title_NewPress(c, _m, RunSave_HasSave());
+        case "continue":   // C1 (D46): Continue run
+            Title_ContinuePress(c);
             break;
-        case "load":   // C1 (D46): Continue run
-            var cont = Run_Continue();
-            if (!cont.ok) Notice_Open(Run_ContinueFailText(cont.status));
+        case "new":
+            Title_NewPress(c, _m);
+            break;
+        case "load":
+            Title_PickerOpen(c, "load");
             break;
         case "settings":
             SettingsPopup_Open("title");
@@ -3417,6 +3581,77 @@ function Title_OnConfirm(_m, _i) {
             break;
         case "exit": game_end(); break;
     }
+}
+
+// The keys of the screen on top of the title, as groups ("[k:confirm] Load"): one framed line in the lower left corner (clear of the build id in the lower right) when they
+// fit side by side, else one group to a row, so a key never wraps away from its word. Load Game also names the delete key.
+function Title_HintGroups(_m) {
+    if (!is_struct(_m)) return [];
+    var back = Loc_T("tab.hint.back", "[k:back] Back");
+    if (_m.id == "slots_load") return [Loc_T("save.hint.load", "[k:confirm] Load"), Loc_T("save.hint.delete", "[k:tab_prev] Delete"), back];
+    if (_m.id == "slots_overwrite") return [Loc_T("save.hint.overwrite", "[k:confirm] Overwrite"), back];
+    return [];
+}
+
+function Title_HintJoin(_groups, _sep) {
+    var out = "";
+    for (var i = 0; i < array_length(_groups); i++) out += ((i > 0) ? _sep : "") + _groups[i];
+    return out;
+}
+
+// The key line's text, layout and rectangle: { txt, lay, inner_w, rect } (rect.w = 0 and no text when the screen on top has no key line).
+function Title_HintPlan(_c, _m) {
+    var groups = Title_HintGroups(_m);
+    var plan = { txt: "", lay: undefined, inner_w: 0, rect: { x: 0, y: 0, w: 0, h: 0 } };
+    if (array_length(groups) <= 0) return plan;
+    var mt = Ui_Metrics();
+    var p = mt.p;
+    var idr = Build_IdRect();
+    plan.inner_w = max(8 * p, idr.x - 2 * mt.margin - 4 * p - 8 * p);
+    plan.txt = Title_HintJoin(groups, "    ");
+    plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
+    if (plan.lay.lines > 1) {
+        plan.txt = Title_HintJoin(groups, chr(10));
+        plan.lay = Prompt_RichLayout(plan.txt, plan.inner_w);
+    }
+    var lw = 0;
+    for (var i = 0; i < array_length(plan.lay.line_w); i++) lw = max(lw, plan.lay.line_w[i]);
+    var w = lw + 8 * p;
+    var h = plan.lay.h + 8 * p;
+    plan.rect = { x: mt.margin, y: mt.gh - mt.margin - h, w: w, h: h };
+    return plan;
+}
+
+// A picker keeps clear of the key line: centred on the screen as usual, but its bottom edge stops above the line when the line would otherwise be covered (it is
+// worked out from the rectangles of the last draw, so the very first frame is centred).
+function Title_PickerFit(_c, _m) {
+    if (!Title_IsPicker(_m)) return;
+    var mt = Ui_Metrics();
+    var hp = Title_HintPlan(_c, _m);
+    if (hp.rect.w <= 0 || _m.rect.w <= 0) {
+        _m.layout.y_bottom = -1;
+        return;
+    }
+    var block_h = (_m.det_rect.w > 0) ? (_m.det_rect.y + _m.det_rect.h - _m.rect.y) : _m.rect.h;
+    var centred_bottom = max(mt.margin, round((mt.gh - block_h) / 2)) + block_h;
+    var limit = hp.rect.y - mt.margin;
+    _m.layout.y_bottom = (centred_bottom > limit) ? limit : -1;
+}
+
+// Draws that line; the rectangle is kept in _c.title_hint_rect for -shots.
+function Title_DrawHints(_c) {
+    _c.title_hint_rect = { x: 0, y: 0, w: 0, h: 0 };
+    var top = Ui_StackTop(_c.title_stk);
+    var hp = Title_HintPlan(_c, top);
+    if (hp.txt == "") return;
+    var a = Ui_MenuAlpha(top, current_time);
+    if (a <= 0) return;
+    var p = Ui_Metrics().p;
+    var r = hp.rect;
+    _c.title_hint_rect = r;
+    Ui_DrawFrame(r.x, r.y, r.w, r.h, a, p);
+    Prompt_RichDraw(r.x + 4 * p, r.y + 4 * p, hp.txt, hp.inner_w, UI_C_LIGHT, fa_left, a);
+    draw_set_alpha(1);
 }
 
 // ---- D152: the seed pick after New Game ----
@@ -3448,8 +3683,16 @@ function Title_SeedChoiceConfirm(_m, _i) {
     Title_NewGameGo(c);
 }
 
-// The title fades out; Title_Step starts the run when the fade is over.
+// The title fades out; Title_Step starts the run when the fade is over. D175: this is where the save file is committed: the chosen one is emptied first when the
+// overwrite picker asked for it (the run in it counts as abandoned), then it becomes the active file the run saves to.
 function Title_NewGameGo(_c) {
+    var slot = variable_instance_exists(_c, "title_new_slot") ? _c.title_new_slot : -1;
+    if (slot >= 0) {
+        if (variable_instance_exists(_c, "title_new_wipe") && _c.title_new_wipe) Slot_Delete(Profiles_Active(), slot);
+        Slot_SetActive(slot);
+    }
+    _c.title_new_slot = -1;
+    _c.title_new_wipe = false;
     _c.title_exit = { at: current_time + UI_PANEL_MS };
     for (var i = 0; i < array_length(_c.title_stk.menus); i++) Ui_MenuClose(_c.title_stk.menus[i]);
 }
@@ -3607,7 +3850,11 @@ function Title_Step(_c) {
         return;
     }
     if (_c.title_refresh) Title_Refresh(_c);
-    Ui_MenuUpdate(Ui_StackTop(_c.title_stk), _c.title_stk);
+    var top = Ui_StackTop(_c.title_stk);
+    if (Title_PickerKeys(_c, top)) return;   // D175: the delete key on a Load Game row
+    var depth0 = Ui_StackDepth(_c.title_stk);
+    Ui_MenuUpdate(top, _c.title_stk);
+    if (depth0 > 1 && Ui_StackDepth(_c.title_stk) == 1) _c.title_refresh = true;   // back on the title: save files may have changed (a delete)
 }
 
 function Title_Draw(_c) {
@@ -3615,8 +3862,14 @@ function Title_Draw(_c) {
     if (is_struct(Title_SeedEntryOf(_c))) {   // D152: the entry screen stands alone over the dimmed picture
         Title_SeedEntryDraw(_c);
     } else {
+        var pk = (Ui_StackDepth(_c.title_stk) >= 2 && Title_IsPicker(_c.title_stk.menus[1])) ? _c.title_stk.menus[1] : undefined;
+        if (is_struct(pk)) {   // D175: a save file picker stands alone over the dimmed picture (the title menu is not drawn under it), clear of its key line
+            if (Ui_StackTop(_c.title_stk) == pk) Title_PickerFit(_c, pk);
+            Ui_DimBackdrop(UI_DIM_POPUP * Ui_MenuAlpha(pk, current_time));
+        }
         Ui_StackDraw(_c.title_stk);
         if (Ui_StackDepth(_c.title_stk) <= 1) Title_DrawCard(_c);   // the Continue card makes way for the seed pick
+        else Title_DrawHints(_c);   // D175: the keys of a save file picker
     }
     draw_set_alpha(1);
     draw_set_color(c_white);
