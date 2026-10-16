@@ -299,21 +299,21 @@ function Test_Suite_Stats() {
     Test_ClassAt("vec cls_knight_3", CLASS_KNIGHT, 3, 13, 16, 9, 3, 22, 13);
     Test_ClassAt("vec cls_knight_5", CLASS_KNIGHT, 5, 15, 20, 9, 3, 37, 15);
     Test_ClassAt("vec cls_knight_10", CLASS_KNIGHT, 10, 20, 30, 9, 3, 70, 20);
-    Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 8, 8, 11, 4, 10, 12);
-    Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 10, 8, 12, 4, 16, 14);
-    Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 12, 8, 12, 4, 22, 16);
-    Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 16, 8, 13, 4, 34, 20);
-    Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 26, 8, 16, 4, 64, 30);
+    Test_ClassAt("vec cls_archer_1", CLASS_ARCHER, 1, 8, 8, 12, 4, 10, 12);
+    Test_ClassAt("vec cls_archer_2", CLASS_ARCHER, 2, 10, 8, 13, 4, 16, 14);
+    Test_ClassAt("vec cls_archer_3", CLASS_ARCHER, 3, 12, 8, 14, 4, 22, 16);
+    Test_ClassAt("vec cls_archer_5", CLASS_ARCHER, 5, 16, 8, 16, 4, 34, 20);
+    Test_ClassAt("vec cls_archer_10", CLASS_ARCHER, 10, 26, 8, 21, 4, 64, 30);
     Test_ClassAt("vec cls_mage_1", CLASS_MAGE, 1, 5, 7, 10, 12, 10, 16);
     Test_ClassAt("vec cls_mage_2", CLASS_MAGE, 2, 5, 7, 10, 15, 16, 19);
     Test_ClassAt("vec cls_mage_3", CLASS_MAGE, 3, 5, 7, 10, 18, 19, 22);
     Test_ClassAt("vec cls_mage_5", CLASS_MAGE, 5, 5, 7, 10, 24, 28, 28);
     Test_ClassAt("vec cls_mage_10", CLASS_MAGE, 10, 5, 7, 10, 39, 52, 43);
-    Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 9, 9, 11, 3, 10, 11);
-    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 11, 9, 12, 3, 16, 12);
-    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 12, 10, 12, 4, 22, 13);
-    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 15, 11, 13, 5, 34, 16);
-    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 23, 13, 16, 7, 64, 22);
+    Test_ClassAt("vec cls_nobody_1", CLASS_NOBODY, 1, 10, 9, 12, 3, 10, 11);
+    Test_ClassAt("vec cls_nobody_2", CLASS_NOBODY, 2, 12, 9, 13, 3, 16, 12);
+    Test_ClassAt("vec cls_nobody_3", CLASS_NOBODY, 3, 13, 10, 13, 4, 22, 13);
+    Test_ClassAt("vec cls_nobody_5", CLASS_NOBODY, 5, 16, 11, 14, 5, 34, 16);
+    Test_ClassAt("vec cls_nobody_10", CLASS_NOBODY, 10, 24, 13, 17, 7, 64, 22);
     Test_Eq("vec exp_1", Exp_NextLevel(1), 12);
     Test_Eq("vec exp_2", Exp_NextLevel(2), 24);
     Test_Eq("vec exp_3", Exp_NextLevel(3), 40);
@@ -405,7 +405,7 @@ function Test_Suite_Stats() {
     _bank = LevelUp_ApplyLevel(_bank);
     global.levelup_auto_place = true;
     Test_Eq("D76 level-up with auto-place off banks 1 free point", _bank.stat_points, 1);
-    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 11 + 8 + 2);   // D186: Archer SPD 11 and ATK 8 at level 1; level 2 is an even level, so SPD grows
+    Test_Eq("D76 level-up with auto-place off still applies the fixed growth (Archer SPD+1 ATK+1)", _bank.stats.spd + _bank.stats.atk, 12 + 8 + 2);   // D186: Archer SPD 12 and ATK 8 at level 1; SPD and ATK grow by 1 a level
     Test_Eq("LevelUp_ApplyLevel gives the HP gain as current HP (Archer L2 = 16)", _bank.hp, 16);
     // EXP: 834 exactly reaches the cap; 624 (a clean pass to the final boss) is level 9.
     var _run = Player_AddExp(CharacterCreate_Player(CLASS_KNIGHT), 834);
@@ -7354,7 +7354,7 @@ function Test_Suite_BalanceD111() {
     Test_D111_Gain("D111 Nobody L10 gain", 10, 1, 0, 1, 0);
     var _nb = CharacterCreate_Player(CLASS_NOBODY);
     for (var _l = 2; _l <= 10; _l++) _nb = LevelUp_ApplyLevel(_nb);
-    Test_True("D111 Nobody L10 stats ATK 23 DEF 13 SPD 16 MAG 7 (9+5+9, 9+4, 11+5, 3+4; D186 start 9/9/11)", _nb.stats.atk == 23 && _nb.stats.def == 13 && _nb.stats.spd == 16 && _nb.stats.mag == 7);
+    Test_True("D111 Nobody L10 stats ATK 24 DEF 13 SPD 17 MAG 7 (10+5+9, 9+4, 12+5, 3+4; D186 start 10/9/12)", _nb.stats.atk == 24 && _nb.stats.def == 13 && _nb.stats.spd == 17 && _nb.stats.mag == 7);
     Test_Eq("D111 THROW_NOBODY_MULT is 2", THROW_NOBODY_MULT, 2);
     Test_Eq("D111 Nobody's throws are x2", Throw_Mult(CharacterCreate_Player(CLASS_NOBODY)), 2);
     Test_Eq("D111 the Knight's throws are x1", Throw_Mult(CharacterCreate_Player(CLASS_KNIGHT)), 1);
@@ -18467,15 +18467,13 @@ function Test_Suite_R3Balance() {
     Test_RunSuite("R3Balance.gold", Test_R3BalanceGold);
     Test_Eq("r3balance: Wound power is 3 (it was 4)", SkillDB_Get(SKILL_WOUND).power, 3);
     Test_Eq("r3balance: Wound still costs 3 MP (so still 3 arrows)", SkillDB_Get(SKILL_WOUND).mp_cost, 3);
-    Test_Eq("r3balance: Horizontal Slash power is 4 (it was 5), cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "4 5");
-    Test_Eq("r3balance: Archer gains SPD on level 2", LevelUp_ClassGrowthGain(CLASS_ARCHER, 2).spd, 1);
-    Test_Eq("r3balance: Archer gains no SPD on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).spd, 0);
-    Test_Eq("r3balance: Archer gains SPD on level 4", LevelUp_ClassGrowthGain(CLASS_ARCHER, 4).spd, 1);
-    Test_Eq("r3balance: Archer gains no SPD on level 9", LevelUp_ClassGrowthGain(CLASS_ARCHER, 9).spd, 0);
+    Test_Eq("r3balance (retuned after D191-D193): Horizontal Slash is back to power 5, cost 5", string(SkillDB_Get(SKILL_HORIZ_SLASH).power) + " " + string(SkillDB_Get(SKILL_HORIZ_SLASH).mp_cost), "5 5");
+    Test_Eq("r3balance (retuned): Archer gains SPD 1 on every level again (level 3)", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).spd, 1);
     Test_Eq("r3balance: Archer still gains ATK 1 on level 3", LevelUp_ClassGrowthGain(CLASS_ARCHER, 3).atk, 1);
     Test_Eq("r3balance: Knight starts at SPD 9", CharacterCreate_Player(CLASS_KNIGHT).stats.spd, 9);
-    Test_Eq("r3balance: Nobody starts at ATK 9 DEF 9 SPD 11", string(CharacterCreate_Player(CLASS_NOBODY).stats.atk) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.def) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.spd), "9 9 11");
-    Test_Eq("r3balance: Archer starts at ATK 8 SPD 11", string(CharacterCreate_Player(CLASS_ARCHER).stats.atk) + " " + string(CharacterCreate_Player(CLASS_ARCHER).stats.spd), "8 11");
+    Test_Eq("r3balance: Nobody starts at ATK 10 DEF 9 SPD 12", string(CharacterCreate_Player(CLASS_NOBODY).stats.atk) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.def) + " " + string(CharacterCreate_Player(CLASS_NOBODY).stats.spd), "10 9 12");
+    Test_Eq("r3balance: Archer starts at ATK 8 SPD 12", string(CharacterCreate_Player(CLASS_ARCHER).stats.atk) + " " + string(CharacterCreate_Player(CLASS_ARCHER).stats.spd), "8 12");
+    Test_Eq("r3balance: an unarmed character hits with weapon power 5 (it was 2; only the Nobody fights unarmed)", COMBAT_UNARMED_POWER, 5);
 }
 
 // D191 (BREAK harder): a multi-hit skill fills the meter like ONE hit; a stun skill fills x1.5 (not x2). Expected values by hand from the owner's rule.
