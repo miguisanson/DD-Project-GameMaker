@@ -375,6 +375,8 @@ function Loot_BuildMessageEntries(_loot, _prefix = "Loot: ") {
     var out = [];
     if (!is_array(_loot)) return out;
     var prefix = string(_prefix);
+    // a prefix that ends in the colon ("전리품:") gets its space (the English row carries it; D9)
+    if (string_length(prefix) > 0 && string_char_at(prefix, string_length(prefix)) != " ") prefix += " ";
 
     for (var i = 0; i < array_length(_loot); i++) {
         var it = _loot[i];

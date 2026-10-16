@@ -148,6 +148,7 @@ function Test_RunAll() {
     Test_RunSuite("Hunt7Prog", Test_Suite_Hunt7Prog);
     Test_RunSuite("TextFit", Test_Suite_TextFit);
     Test_RunSuite("Hunt7Map", Test_Suite_Hunt7Map);
+    Test_RunSuite("Hunt7Feel", Test_Suite_Hunt7Feel);
     if (Test_HasFlag("-testcontrol")) {
         // Deliberately failing assertion: proves a red run is reported (want 2, got 1).
         Test_Eq("negative_control", 1, 2);
@@ -14302,4 +14303,98 @@ function Test_Hunt7MapSave() {
         instance_destroy(_d);
         variable_struct_remove(_gs.persist, _key);
     }
+}
+
+
+// ============================================================================================================
+// Bug hunt 7, feel and audio (hunt7feel): R-080..R-084.
+//   (The QTE clocks over a real focus loss, in a fight, are checked in the smoke run, steps 990..999.)
+// ============================================================================================================
+function Test_Suite_Hunt7Feel() {
+    Test_RunSuite("Hunt7Feel.freeze", Test_Hunt7FeelFreeze);
+    Test_RunSuite("Hunt7Feel.text", Test_Hunt7FeelText);
+    Test_RunSuite("Hunt7Feel.deny", Test_Hunt7FeelDeny);
+    Test_RunSuite("Hunt7Feel.break", Test_Hunt7FeelBreak);
+    Test_RunSuite("Hunt7Feel.bus", Test_Hunt7FeelBus);
+}
+
+// 1. R-080 (D122): while the window is not in front every QTE clock (the sliding bar, the arrows, the defence bar with its telegraph) advances by nothing.
+function Test_Hunt7FeelFreeze() {
+    var _had = variable_global_exists("focus_prev");
+    var _old = _had ? global.focus_prev : true;
+    global.focus_prev = true;
+    Test_Eq("hunt7feel freeze: with the window in front a 16667 us frame adds 16.667 ms", Qte_StepMs(16667), 16.667);
+    global.focus_prev = false;
+    Test_Eq("hunt7feel freeze: with the window out of front a frame adds nothing", Qte_StepMs(16667), 0);
+    Test_Eq("hunt7feel freeze: a hitch adds nothing either", Qte_StepMs(200000), 0);
+    global.focus_prev = true;
+    Test_Eq("hunt7feel freeze: and when it is back the clock runs again", Qte_StepMs(16667), 16.667);
+    global.focus_prev = _old;
+}
+
+// 2. R-081 (D9, D133): the Korean loot line has its space after the colon; the auto-resolve victory line is a localized row.
+function Test_Hunt7FeelText() {
+    var _lang = Loc_GetLanguage();
+    var _loot = [{ item_id: 31, qty: 1 }];
+    Loc_SetLanguage("en");
+    var _en = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
+    Test_Eq("hunt7feel text: the English loot line", _en[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Loc_SetLanguage("ko");
+    var _ko = Loot_BuildMessageEntries(_loot, Loc_T("combat.msg.loot_prefix", "Loot: "));
+    Test_Eq("hunt7feel text: the Korean loot line has a space after the colon", _ko[0].text, "전리품: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: a prefix that already ends in a space gets no second one", Loot_BuildMessageEntries(_loot, "Loot: ")[0].text, "Loot: " + string(ItemDB_Get(31).name) + " x1");
+    Test_Eq("hunt7feel text: the Korean auto-resolve victory line is Korean", Enemy_AutoResolveBuildMessage({ name: "슬라임" }, { }), "슬라임을(를) 가볍게 쓰러뜨렸습니다.");
+    Loc_SetLanguage("en");
+    Test_Eq("hunt7feel text: the English auto-resolve victory line is unchanged", Enemy_AutoResolveBuildMessage({ name: "Slime" }, { }), "You overpower Slime.");
+    Loc_SetLanguage(_lang);
+}
+
+// 3. R-082 (D133): a row the player cannot use (a skill that costs too much MP, a list with nothing in it) answers with the refusal sound, not the confirm ding.
+function Test_Hunt7FeelDeny() {
+    var _bc = Test_H3Bc();
+    _bc.run_fails = 0;
+    _bc.p.skills = [SKILL_MUSCLE_UP];
+    _bc.p.inventory = [];
+    var _rows = Battle_SkillRows(_bc.p, _bc.e);
+    Test_True("hunt7feel deny: (setup) the skill costs MP", _rows[0].cost > 0);
+    _bc.p.mp = _rows[0].cost;
+    Battle_MenusBuild(_bc);
+    Test_Eq("hunt7feel deny: a skill the player can pay for confirms", Ui_ConfirmSound(_bc.ui_skill, 0), "ui_confirm");
+    _bc.p.mp = 0;
+    Battle_MenusBuild(_bc);
+    Test_Eq("hunt7feel deny: a skill with too little MP is refused", Ui_ConfirmSound(_bc.ui_skill, 0), "ui_deny");
+    Test_Eq("hunt7feel deny: Attack in the command menu confirms", Ui_ConfirmSound(_bc.ui_cmd, 0), "ui_confirm");
+    Test_Eq("hunt7feel deny: Skill with a skill known confirms", Ui_ConfirmSound(_bc.ui_cmd, 1), "ui_confirm");
+    Test_Eq("hunt7feel deny: Item with an empty bag is refused", Ui_ConfirmSound(_bc.ui_cmd, 2), "ui_deny");
+    _bc.p.skills = [];
+    Battle_MenusBuild(_bc);
+    Test_Eq("hunt7feel deny: Skill with no skills is refused", Ui_ConfirmSound(_bc.ui_cmd, 1), "ui_deny");
+    Test_Eq("hunt7feel deny: Guard still confirms", Ui_ConfirmSound(_bc.ui_cmd, 3), "ui_confirm");
+    instance_destroy(_bc.enemy_inst);
+}
+
+// 4. R-083 (D138): the BREAK layer is a different sample from the grade sound it lands on, for every grade (a Perfect used to start the same sample twice).
+function Test_Hunt7FeelBreak() {
+    SFX_RegisterDefaults();
+    var _grades = [QTE_PERFECT, QTE_GOOD, QTE_OK, QTE_WEAK];
+    for (var _g = 0; _g < array_length(_grades); _g++) {
+        var _grade_key = Qte_GradeSfxKey(_grades[_g]);
+        var _layer_key = Battle_BreakSfxKey(_grades[_g] == QTE_PERFECT);
+        var _a = SFX_DebugResolve(_grade_key);
+        var _b = SFX_DebugResolve(_layer_key);
+        Test_True("hunt7feel break: (setup) grade " + string(_g) + " and its BREAK layer both resolve", _a.ok && _b.ok);
+        Test_True("hunt7feel break: the BREAK layer on grade " + string(_g) + " is another sample than the grade sound", _a.asset != _b.asset);
+    }
+}
+
+// 5. R-084 (D49): world sounds (chest, barrel, torch, the "!" and "?" over an enemy) follow the SFX volume; menu sounds follow the UI volume.
+function Test_Hunt7FeelBus() {
+    SFX_RegisterDefaults();
+    var _world = ["chest_open", "barrel_break", "kill_torch", "alert_spotted", "alert_lost"];
+    for (var _i = 0; _i < array_length(_world); _i++) {
+        Test_True("hunt7feel bus: " + _world[_i] + " resolves to a sound", SFX_DebugResolve(_world[_i]).ok);
+        Test_Eq("hunt7feel bus: " + _world[_i] + " is on the SFX bus", SFX_CategoryForKey(_world[_i]), "sfx");
+    }
+    var _ui = ["ui_move", "ui_confirm", "ui_back", "ui_openclose", "ui_deny", "save_confirm"];
+    for (var _j = 0; _j < array_length(_ui); _j++) Test_Eq("hunt7feel bus: " + _ui[_j] + " stays on the UI bus", SFX_CategoryForKey(_ui[_j]), "ui");
 }

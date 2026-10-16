@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T05:02:54Z",
-    "row_count": 1208
+    "generated_at_utc": "2026-10-16T06:15:14Z",
+    "row_count": 1209
   },
   "default_lang": "en",
   "languages": [
@@ -1011,6 +1011,10 @@
     "combat.msg.nothing_to_steal": {
       "en": "Nothing to steal.",
       "ko": "훔칠 것이 없습니다."
+    },
+    "combat.msg.overpower_prefix": {
+      "en": "You overpower {enemy}.",
+      "ko": "{enemy}을(를) 가볍게 쓰러뜨렸습니다."
     },
     "combat.msg.passive.mirror_stitch": {
       "en": "Mirror Stitch repelled a status!",

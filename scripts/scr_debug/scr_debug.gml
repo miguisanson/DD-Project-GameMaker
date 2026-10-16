@@ -7785,19 +7785,31 @@ function Scenario_StepSmokeFairUi(_s) {
             }
             if (_s.t > 300) { Scenario_Check("fairui_the_bar_runs", false, "state=" + string(_bc != noone ? _bc.battle_state : -1) + " qte=" + string(_bc != noone ? _bc.qte_ms : 0)); Scenario_Finish(); }
             break;
-        case 202:   // unfocused over a running bar: the menu does NOT open (the bar is never interrupted) until the bar is over; the music is down
+        case 202:   // unfocused over a running bar: the menu does NOT open (the bar is never interrupted), the music is down, and the bar's clock is FROZEN (D122, hunt7feel)
             if (_s.t == 1) {
                 Scenario_Check("fairui_losing_focus_over_a_running_bar_does_not_open_the_menu", _gs.ui.mode == UI_NONE && _bc.battle_state == BSTATE_ATTACK_TIMING, "mode=" + string(_gs.ui.mode) + " state=" + string(_bc.battle_state));
                 Scenario_Check("fairui_the_music_is_lowered_while_unfocused", BGM_Duck() < 1, "duck=" + string(BGM_Duck()));
                 _s.fu_q1 = _bc.qte_ms;
             }
-            if (_s.t == 6) Scenario_Check("fairui_the_bar_clock_keeps_running_over_a_focus_loss", _bc.qte_ms > _s.fu_q1 || _bc.battle_state != BSTATE_ATTACK_TIMING, "q1=" + string(_s.fu_q1) + " now=" + string(_bc.qte_ms));
-            if (_gs.ui.mode == UI_NONE) Focus_Step(false);   // the UI controller asks again every step; the loss waits (pending) until it can open
-            if (_gs.ui.mode == UI_MENU) {
-                Scenario_Check("fairui_the_menu_opens_once_the_bar_is_over", !Battle_QteBusy(_bc) && is_struct(TabMenu_Get()), "state=" + string(_bc.battle_state));
-                Scenario_Next(_s, 203);
+            if (_s.t > 1 && _s.t < 40) Focus_Step(false);   // the UI controller asks again every step
+            if (_s.t == 40) {
+                Scenario_Check("fairui_the_bar_clock_is_frozen_while_the_window_is_out_of_focus", _bc.qte_ms == _s.fu_q1 && _bc.battle_state == BSTATE_ATTACK_TIMING, "q1=" + string(_s.fu_q1) + " now=" + string(_bc.qte_ms) + " state=" + string(_bc.battle_state));
+                Scenario_Check("fairui_the_bar_was_running_before_the_loss", _s.fu_q0 >= 100, "q0=" + string(_s.fu_q0));
+                Scenario_Check("fairui_no_menu_opened_over_the_frozen_bar", _gs.ui.mode == UI_NONE, "mode=" + string(_gs.ui.mode));
+                Focus_Step(true);
+                _s.fu_q3 = _bc.qte_ms;
             }
-            if (_s.t > 600) { Scenario_Check("fairui_the_menu_opens_after_the_bar", false, "state=" + string(_bc.battle_state) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
+            if (_s.t == 48) {
+                Scenario_Check("fairui_the_bar_carries_on_from_where_it_stopped", (_bc.battle_state == BSTATE_ATTACK_TIMING && _bc.qte_ms > _s.fu_q3 && _bc.qte_ms - _s.fu_q3 < 400) || _bc.battle_state != BSTATE_ATTACK_TIMING, "q3=" + string(_s.fu_q3) + " now=" + string(_bc.qte_ms) + " state=" + string(_bc.battle_state));
+            }
+            if (_s.t > 48) {   // the bar runs out (no press); once the fight waits for the player again, the window loses focus again: now the menu may open
+                if (_gs.ui.mode == UI_NONE && _bc.battle_state == BSTATE_MENU && _bc.turn == TURN_PLAYER) Focus_Step(false);
+                if (_gs.ui.mode == UI_MENU) {
+                    Scenario_Check("fairui_the_menu_opens_once_the_bar_is_over", !Battle_QteBusy(_bc) && is_struct(TabMenu_Get()), "state=" + string(_bc.battle_state));
+                    Scenario_Next(_s, 203);
+                }
+            }
+            if (_s.t > 900) { Scenario_Check("fairui_the_menu_opens_after_the_bar", false, "state=" + string(_bc.battle_state) + " mode=" + string(_gs.ui.mode)); Scenario_Finish(); }
             break;
         case 203:   // focus returns: the menu stays open and the music comes back; Back closes it and the fight goes on
             switch (_s.t) {
