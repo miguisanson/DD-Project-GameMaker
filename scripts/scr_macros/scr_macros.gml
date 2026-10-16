@@ -48,10 +48,12 @@
 #macro STAT_SPD 2
 #macro STAT_MAG 3
 #macro LEVEL_FREE_POINTS_PER_LEVEL 1   // D76
-#macro FREE_POINT_MAX_HP 4            // D143: the free point may also go to Max HP (+FREE_POINT_HP_GAIN) ...
-#macro FREE_POINT_MAX_MP 5            // ... or Max MP (+FREE_POINT_MP_GAIN); these ids sit after STAT_MAG, so no stat table sees them
-#macro FREE_POINT_HP_GAIN 3
-#macro FREE_POINT_MP_GAIN 2
+#macro STAT_VIG 4                      // D176: VIG gives Max HP, MND gives Max MP (soft-capped curves, Resource_MaxHpOfVig / Resource_MaxMpOfMnd); the free point may go to any of the six
+#macro STAT_MND 5
+#macro VIG_START 10                    // every class starts at VIG 10 = Max HP 10; MND starts by class (DB_PlayerClass stats.mnd)
+#macro MND_BASE 10                     // MND 10 = Max MP 10
+#macro LEGACY_HP_PER_POINT 3           // D143 (before D176): a free point on Max HP gave +3, on Max MP +2: an older save keeps them as hp_bonus / mp_bonus, Player_MigrateVigMnd turns them into VIG / MND points
+#macro LEGACY_MP_PER_POINT 2
 #macro PLAYER_BASE_HP 10
 #macro PLAYER_BASE_MP 10
 #macro COMBAT_UNARMED_POWER 2           // weapon power of a character with no weapon equipped

@@ -3,8 +3,8 @@
     "version": 1,
     "source_sheet": "strings",
     "source_schema": "minimal",
-    "generated_at_utc": "2026-10-16T12:24:13Z",
-    "row_count": 1244
+    "generated_at_utc": "2026-10-16T13:42:40Z",
+    "row_count": 1248
   },
   "default_lang": "en",
   "languages": [
@@ -2237,8 +2237,8 @@
       "ko": "구간을 놓치면 피해가 {pct}% 줄어듭니다."
     },
     "help.stats.help": {
-      "en": "What Power, ATK, DEF, MAG, SPD, Crit, the grades, BREAK and every status mean.",
-      "ko": "위력, ATK, DEF, MAG, SPD, 치명타, 등급, 브레이크와 모든 상태 이상의 뜻입니다."
+      "en": "What Power, ATK, DEF, MAG, SPD, VIG, MND, Crit, the grades, BREAK and every status mean.",
+      "ko": "위력, ATK, DEF, MAG, SPD, VIG, MND, 치명타, 등급, 브레이크와 모든 상태 이상의 뜻입니다."
     },
     "help.stats.title": {
       "en": "Stats & Terms",
@@ -3145,12 +3145,20 @@
       "ko": "전투 능력에 영향을 줍니다."
     },
     "menu.tooltip.stat.mag.desc": {
-      "en": "Increases spell damage and max [t]MP[/t].",
-      "ko": "마법 피해와 최대 [t]MP[/t]를 늘립니다."
+      "en": "Increases spell damage.",
+      "ko": "마법 피해를 늘립니다."
+    },
+    "menu.tooltip.stat.mnd.desc": {
+      "en": "Raises max [t]MP[/t]. The more you add, the less each point gives.",
+      "ko": "최대 [t]MP[/t]를 늘립니다. 많이 올릴수록 포인트 하나의 효과는 줄어듭니다."
     },
     "menu.tooltip.stat.spd.desc": {
       "en": "Decides who acts first.",
       "ko": "누가 먼저 행동할지 정합니다."
+    },
+    "menu.tooltip.stat.vig.desc": {
+      "en": "Raises max [t]HP[/t]. The more you add, the less each point gives.",
+      "ko": "최대 [t]HP[/t]를 늘립니다. 많이 올릴수록 포인트 하나의 효과는 줄어듭니다."
     },
     "menu.tooltip.status.default": {
       "en": "Status",
@@ -4695,6 +4703,14 @@
     "tab.lbl.level": {
       "en": "Level",
       "ko": "레벨"
+    },
+    "tab.lbl.max_hp": {
+      "en": "Max HP",
+      "ko": "최대 HP"
+    },
+    "tab.lbl.max_mp": {
+      "en": "Max MP",
+      "ko": "최대 MP"
     },
     "tab.lbl.met": {
       "en": "Met",

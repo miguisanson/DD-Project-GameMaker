@@ -78,29 +78,35 @@ function TabMenu_Signed(_n) {
     return ((_n > 0) ? "+" : "") + string(_n);
 }
 
-// ---- Status: ATK DEF SPD MAG with what each does, then the statuses on the character ----
+// ---- Status: ATK DEF SPD MAG VIG MND with what each does, then the statuses on the character ----
 function Stat_Sentence(_stat_id) {
     switch (_stat_id) {
         case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
-        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage.");
+        case STAT_VIG: return Loc_T("menu.tooltip.stat.vig.desc", "Raises max HP. The more you add, the less each point gives.");   // D176
+        case STAT_MND: return Loc_T("menu.tooltip.stat.mnd.desc", "Raises max MP. The more you add, the less each point gives.");
     }
     return Loc_T("menu.tooltip.stat.default.desc", "Affects battle performance.");
 }
 
 function TabStatus_Items(_ch) {
     var items = [];
-    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG];
-    for (var i = 0; i < 4; i++) {
+    var sids = [STAT_ATK, STAT_DEF, STAT_SPD, STAT_MAG, STAT_VIG, STAT_MND];
+    for (var i = 0; i < array_length(sids); i++) {
         var sid = sids[i];
         var base = variable_struct_get(_ch.stats, Stat_Key(sid));
-        var gear = Equip_GetStatBonus(_ch, sid);
-        var fx = Status_ModStat(_ch, sid);
         var lines = [{ label: Loc_T("tab.lbl.base", "Base"), value: string(base) }];
-        if (gear != 0) array_push(lines, { label: Loc_T("tab.lbl.gear", "Gear"), value: TabMenu_Signed(gear) });
-        if (fx != 0) array_push(lines, { label: Loc_T("tab.lbl.effects", "Effects"), value: TabMenu_Signed(fx) });
-        array_push(lines, { label: Loc_T("tab.lbl.total", "Total"), value: string(Stat_Get(_ch, sid)) });
+        if (sid == STAT_VIG || sid == STAT_MND) {   // D176: no gear or effect touches them: the line that matters is what they make
+            array_push(lines, (sid == STAT_VIG) ? { label: Loc_T("tab.lbl.max_hp", "Max HP"), value: string(_ch.max_hp) } : { label: Loc_T("tab.lbl.max_mp", "Max MP"), value: string(_ch.max_mp) });
+        } else {
+            var gear = Equip_GetStatBonus(_ch, sid);
+            var fx = Status_ModStat(_ch, sid);
+            if (gear != 0) array_push(lines, { label: Loc_T("tab.lbl.gear", "Gear"), value: TabMenu_Signed(gear) });
+            if (fx != 0) array_push(lines, { label: Loc_T("tab.lbl.effects", "Effects"), value: TabMenu_Signed(fx) });
+            array_push(lines, { label: Loc_T("tab.lbl.total", "Total"), value: string(Stat_Get(_ch, sid)) });
+        }
         var row = { id: Stat_Key(sid), label: Stat_ShortName(sid), value: string(Stat_Get(_ch, sid)), kind: "button", enabled: true, help: Stat_Sentence(sid), lines: lines, hint: "" };
         if (is_struct(_ch.class_cfg) && variable_struct_exists(_ch.class_cfg, "sprites") && sprite_exists(_ch.class_cfg.sprites.down)) row.pic = { spr: _ch.class_cfg.sprites.down, sub: 0 };
         array_push(items, row);
@@ -693,9 +699,9 @@ function Help_Term(_id, _label, _help) {
 function Help_StatsItems() {
     var out = [];
     array_push(out, Help_Term("power", Loc_T("card.lbl.power", "Power"), Loc_T("help.line.power", "How hard a weapon or skill hits. More Power means more damage.")));
-    var stat_ids = [STAT_ATK, STAT_DEF, STAT_MAG, STAT_SPD];
-    var stat_keys = ["atk", "def", "mag", "spd"];
-    for (var i = 0; i < 4; i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
+    var stat_ids = [STAT_ATK, STAT_DEF, STAT_MAG, STAT_SPD, STAT_VIG, STAT_MND];
+    var stat_keys = ["atk", "def", "mag", "spd", "vig", "mnd"];
+    for (var i = 0; i < array_length(stat_ids); i++) array_push(out, Help_Term(stat_keys[i], Stat_ShortName(stat_ids[i]), Stat_Sentence(stat_ids[i])));
     array_push(out, Help_Term("hp", Loc_T("battle.hud.hp", "HP"), Loc_T("help.line.hp", "Health. At 0 HP you fall.")));
     array_push(out, Help_Term("mp", Loc_T("battle.hud.mp", "MP"), Loc_T("help.line.mp", "Magic points. Skills spend them; potions and rest restore them.")));
     array_push(out, Help_Term("crit", Loc_T("help.term.crit", "Crit"), Loc_T("help.line.crit", "A critical hit deals {mult} times the damage. [t]Take Aim[/t] and some gear raise the odds.", { mult: string(COMBAT_CRIT_MULT) })));
@@ -1681,16 +1687,16 @@ function CardsUi_StatHelp(_stat_id) {
         case STAT_ATK: return Loc_T("menu.tooltip.stat.atk.desc", "Increases physical damage (basic attacks and ATK skills).");
         case STAT_DEF: return Loc_T("menu.tooltip.stat.def.desc", "Reduces all damage you take.");
         case STAT_SPD: return Loc_T("menu.tooltip.stat.spd.desc", "Decides who acts first.");
-        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage and max MP.");
-        case FREE_POINT_MAX_HP: return Loc_T("cards.stat.maxhp.desc", "Raises your max HP by {n} and restores {n} HP.", { n: FREE_POINT_HP_GAIN });   // D143
-        case FREE_POINT_MAX_MP: return Loc_T("cards.stat.maxmp.desc", "Raises your max MP by {n} and restores {n} MP.", { n: FREE_POINT_MP_GAIN });
+        case STAT_MAG: return Loc_T("menu.tooltip.stat.mag.desc", "Increases spell damage.");
+        case STAT_VIG: return Loc_T("menu.tooltip.stat.vig.desc", "Raises max HP. The more you add, the less each point gives.");   // D176
+        case STAT_MND: return Loc_T("menu.tooltip.stat.mnd.desc", "Raises max MP. The more you add, the less each point gives.");
     }
     return "";
 }
 
 function CardsUi_StatMenu() {
     var ch = GameState_Get().player_ch;
-    var opts = Cards_FreePointOptions(ch);   // D143: the four stats, Max HP, Max MP
+    var opts = Cards_FreePointOptions(ch);   // D176: ATK DEF SPD MAG VIG MND
     var plvl = LevelUp_PromptLevel(ch);   // hunt 7: a fight that gave several levels steps through each level's growth, oldest first
     var items = [];
     for (var i = 0; i < array_length(opts); i++) {
@@ -1705,7 +1711,7 @@ function CardsUi_StatMenu() {
         on_confirm: CardsUi_StatConfirm, on_back: CardsUi_NoBack,
         layout: { title: Loc_T("cards.stat.title", "Level {lvl}: Place 1 Point", { lvl: string(plvl) }), note: LevelUp_GrowthText(ch.class_id, plvl), anchor: "center", details: true }
     });
-    Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 3));   // the class's usual stat first
+    Ui_MenuFixCursor(m, clamp(DB_PlayerClass(ch.class_id).free_default, 0, 5));   // the class's usual stat first
     return m;
 }
 

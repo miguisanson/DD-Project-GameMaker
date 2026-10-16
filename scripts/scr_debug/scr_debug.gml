@@ -4466,7 +4466,7 @@ function Export_Build() {
     ItemDB_Init(); SkillDB_Init(); StatusDB_Init(); EnemyDB_Init(); Loot_Init();
     var data = { version: 1, build: BUILD_ID, spec: ".planning/research/combat-spec.md" };
     data.constants = {
-        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG },
+        stat_ids: { atk: STAT_ATK, def: STAT_DEF, spd: STAT_SPD, mag: STAT_MAG, vig: STAT_VIG, mnd: STAT_MND },
         stat_min: STAT_MIN, stat_max: STAT_MAX, level_cap: LEVEL_CAP_TECHNICAL,
         power_scale: COMBAT_POWER_SCALE, weapon_skill_share: COMBAT_WEAPON_SKILL_SHARE, unarmed_power: COMBAT_UNARMED_POWER,
         crit_mult: COMBAT_CRIT_MULT, crit_chance_max: COMBAT_CRIT_CHANCE_MAX, free_points_per_level: LEVEL_FREE_POINTS_PER_LEVEL,
@@ -4490,7 +4490,7 @@ function Export_Build() {
                 array_push(cfg.growth_per_level, { level: lv2, gain: LevelUp_ClassGrowthGain(class_ids[ci], lv2) });
                 ch = LevelUp_ApplyLevel(ch);
             }
-            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, hp: ch.max_hp, mp: ch.max_mp });
+            array_push(cfg.by_level, { level: lv2, atk: ch.stats.atk, def: ch.stats.def, spd: ch.stats.spd, mag: ch.stats.mag, vig: ch.stats.vig, mnd: ch.stats.mnd, hp: ch.max_hp, mp: ch.max_mp });   // D176: hp / mp are the VIG / MND curves (the simulator reads them)
         }
         array_push(data.classes, cfg);
     }
@@ -7477,7 +7477,7 @@ function Scenario_StepBotD1a(_s) {
                 var _t2 = _s.stt;
                 Scenario_Check("bot_i065_back_in_the_floor", room == rm_floor1, "room=" + room_get_name(room));
                 Scenario_Check("bot_i065_level_after_the_fight_is_not_lower", _after.level >= _t2.level, "after=" + string(_after.level) + " before=" + string(_t2.level));
-                Scenario_Check("bot_i065_max_hp_after_the_fight_follows_the_level", _after.max_hp == Resource_MaxHp(_after.class_cfg.hd, _after.level), "max_hp=" + string(_after.max_hp));
+                Scenario_Check("bot_i065_max_hp_after_the_fight_follows_the_level", _after.max_hp == Resource_MaxHpOfVig(_after.stats.vig), "max_hp=" + string(_after.max_hp));
                 Scenario_Check("bot_i065_stats_after_the_fight_are_not_lower", _after.stats.atk >= _t2.atk && _after.stats.def >= _t2.def && _after.stats.spd >= _t2.spd && _after.stats.mag >= _t2.mag);
                 Scenario_Check("bot_i065_hp_after_the_fight_is_in_bounds", _after.hp > 0 && _after.hp <= _after.max_hp, "hp=" + string(_after.hp) + "/" + string(_after.max_hp));
                 Scenario_Next(_s, 3);

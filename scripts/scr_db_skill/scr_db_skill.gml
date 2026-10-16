@@ -2127,6 +2127,8 @@ function Card_ClassCharacter(_old, _class_id) {
             ch.stats.def = StatClamp(ch.stats.def + g.def);
             ch.stats.spd = StatClamp(ch.stats.spd + g.spd);
             ch.stats.mag = StatClamp(ch.stats.mag + g.mag);
+            ch.stats.vig = StatClamp(ch.stats.vig + g.vig);   // D176
+            ch.stats.mnd = StatClamp(ch.stats.mnd + g.mnd);
         }
         Card_EnsureFields(_old);
         var kept = [];
