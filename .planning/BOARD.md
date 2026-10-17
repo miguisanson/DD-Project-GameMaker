@@ -6,7 +6,7 @@ Build: SHIPPED v1.0 (2026-10-17)
 - **Upload:** `E:\Games\NO HOPE Release\NO-HOPE-v1.0-windows.zip` + paste `itch-page.md` + the 6 PNGs in `itch-screenshots\` (in order). Free / pay what you want.
 - **Optional before uploading (GameMaker):** Game Options > Windows: display name "NO HOPE", company, description, icon. Remove the unused fonts NotoSansCJKkr / NanumGothic if you like (not in the zip anyway).
 - **In v1.0:** all round-3 and round-4 notes, profiles + 3 save files + Save in the menu, stealth (cone, bushes break chases), rarity colours, gold outline on loot, mouse, VIG/MND level-up, Guard + MP, weak points, death tips, trapped chests, boss finisher, harder BREAK, slower SPD, less gold, even sound levels, credits screen. Every build passed the full gate.
-- **Code:** merged to `main`, tagged `v1.0` on this PC only (nothing pushed). Development can resume any time: see `.planning/RESUME.md`.
+- **Code:** merged to `main`, tagged `v1.0`, pushed to GitHub (main + tag). Development can resume any time: see `.planning/RESUME.md`.
 
 ## Done
 - Overnight 2026-10-15/16: fairer randomness (D117-D125), alt-tab pause, flee % and crit odds shown, difficulty list removed, New Game asks twice when a run is saved, optimisation pass (menus ~22x, items ~20x, battle HUD ~2.6x faster), ~1,400 lines of dead code removed, an extra Opus review (1 real bug fixed).
