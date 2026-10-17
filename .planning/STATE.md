@@ -24,7 +24,7 @@ progress:
 | Last stable build | `v1.9` @ its first commit (planning docs only) |
 | Regressions since last stable build | 0 |
 | Open P1s | 0 (none confirmed; see `ISSUES.md`) |
-| WIP | NONE. SHIPPED NO HOPE v1.0 on 2026-10-17 (main = v1.9 = next, tag v1.0, not pushed). Release zip + itch text in E:\Games\NO HOPE Release. Read .planning/RESUME.md for where everything is and how to resume development. |
+| WIP | NONE. SHIPPED NO HOPE v1.0 on 2026-10-17 (main = v1.9 = next, tag v1.0, main + tag pushed to GitHub). Release zip + itch text in E:\Games\NO HOPE Release. Read .planning/RESUME.md for where everything is and how to resume development. |
 | Unplayed features | 61 playtest entries (PLAYTEST-QUEUE, build dbc678a-20261015) |
 | Regression list | never run (`REGRESSION.md`, 48 entries) |
 | Drive E: | 2026-10-17 cleanup with the owner's OK: 127 unused E:\Temp\dd-gate* folders (42.5 GB), 1576 old E:\Temp\claude session folders older than 24 h (20.2 GB) and 41 merged worktrees removed; E: 215 GB free. Kept: dd-gate-next, active packets' gate folders, worktrees next/levelup/ideas1 and h12/h13b (landed through integ branches; branches all kept). Delete a packet's E:\Temp\dd-gate-<short> once it is merged. |
